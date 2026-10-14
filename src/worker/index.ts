@@ -3,11 +3,14 @@ import { config } from "dotenv";
 config();
 
 async function main() {
+  // Selects the worker's database pool size in src/lib/db.ts.
+  process.env.PROCESS ||= "worker";
   const { Worker } = await import("bullmq");
   const { QUEUE_NAME, beatWorkerHeart, reconcileSchedules, pruneOldActivity, redisConnection } = await import(
     "../lib/jobs"
   );
   const { runUserCheck } = await import("../lib/blocker-run");
+  const { notifyUser } = await import("../lib/mail");
   const { log } = await import("../lib/log");
 
   await reconcileSchedules();
@@ -28,10 +31,20 @@ async function main() {
         log.error("prune failed", { message: error instanceof Error ? error.message : "unknown" });
       });
   }, 6 * 60 * 60 * 1000);
+  const reconcile = setInterval(() => {
+    reconcileSchedules({ onlyMissing: true }).catch((error) => {
+      log.error("reconcile failed", { message: error instanceof Error ? error.message : "unknown" });
+    });
+  }, 5 * 60 * 1000);
 
   const worker = new Worker(
     QUEUE_NAME,
     async (job) => {
+      if (job.name === "notify") {
+        const { email, kind } = job.data ?? {};
+        if (typeof email === "string" && (kind === "broken" || kind === "quota")) await notifyUser(email, kind);
+        return;
+      }
       const userId = typeof job.data?.userId === "string" ? job.data.userId : "";
       if (!userId) return;
       await runUserCheck(userId);
@@ -48,6 +61,7 @@ async function main() {
   const shutdown = async () => {
     clearInterval(beat);
     clearInterval(prune);
+    clearInterval(reconcile);
     await worker.close();
     process.exit(0);
   };

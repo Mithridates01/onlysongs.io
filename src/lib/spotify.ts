@@ -5,6 +5,18 @@ import type { ParsedSpotify, SpotifyKind } from "./spotify-uri";
 const ACCOUNTS = "https://accounts.spotify.com";
 const API = "https://api.spotify.com/v1";
 
+// The load-test harness points the app at a fake Spotify. It needs both
+// variables and is refused when NODE_ENV is production.
+function spotifyBases(): { accounts: string; api: string } {
+  const fake = process.env.SPOTIFY_FAKE_URL?.trim();
+  if (!fake) return { accounts: ACCOUNTS, api: API };
+  if (process.env.ONLYSONGS_LOAD_TEST !== "1" || process.env.NODE_ENV === "production") {
+    throw new Error("SPOTIFY_FAKE_URL is only allowed in a load test, never in production.");
+  }
+  const base = fake.replace(/\/$/, "");
+  return { accounts: base, api: `${base}/v1` };
+}
+
 export const PLAYBACK_SCOPES = "user-read-playback-state user-modify-playback-state user-read-currently-playing";
 
 export type SpotifyImage = { url?: string; width?: number; height?: number };
@@ -65,13 +77,14 @@ export async function refreshTokens(opts: {
   clientId: string;
   clientSecret: string;
   refreshToken: string;
+  signal?: AbortSignal;
   fetchImpl?: FetchLike;
 }): Promise<TokenResponse> {
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: opts.refreshToken,
   });
-  return postToken(opts.clientId, opts.clientSecret, body, opts.fetchImpl);
+  return postToken(opts.clientId, opts.clientSecret, body, opts.fetchImpl, opts.signal);
 }
 
 async function postToken(
@@ -79,16 +92,19 @@ async function postToken(
   clientSecret: string,
   body: URLSearchParams,
   fetchImpl: FetchLike = fetch,
+  signal?: AbortSignal,
 ): Promise<TokenResponse> {
+  const tokenUrl = `${spotifyBases().accounts}/api/token`;
   let res: Response;
   try {
-    res = await fetchImpl(`${ACCOUNTS}/api/token`, {
+    res = await fetchImpl(tokenUrl, {
       method: "POST",
       headers: {
         Authorization: basicAuth(clientId, clientSecret),
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body,
+      signal,
     });
   } catch (error) {
     log.error("spotify token network error", { message: error instanceof Error ? error.message : "unknown" });
@@ -156,7 +172,7 @@ export async function apiRequest(opts: {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(opts.jsonBody);
   }
-  const url = opts.path.startsWith("http") ? opts.path : `${API}${opts.path}`;
+  const url = opts.path.startsWith("http") ? opts.path : `${spotifyBases().api}${opts.path}`;
   try {
     const res = await fetchImpl(url, { method: opts.method ?? "GET", headers, body, signal: opts.signal });
     const text = await res.text();

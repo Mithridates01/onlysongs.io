@@ -10,3 +10,4 @@ coverage
 .prisma
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+scripts/load/results

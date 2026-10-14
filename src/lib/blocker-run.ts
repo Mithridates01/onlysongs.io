@@ -1,5 +1,5 @@
-import type { PollState, SpotifyConnection } from "@prisma/client";
-import { authorizedCall } from "./accounts";
+import type { PollState, Prisma, SpotifyConnection } from "@prisma/client";
+import { authorizedCall, markConnectionBroken } from "./accounts";
 import {
   COOLDOWN_MS,
   FAILURE_WARN_AT,
@@ -14,9 +14,8 @@ import {
   type Replacement,
 } from "./blocker-logic";
 import { prisma } from "./db";
-import { withUserLock } from "./jobs";
+import { enqueueNotify, withUserLock } from "./jobs";
 import { log } from "./log";
-import { notifyUser } from "./mail";
 import { isQuietNow, parseQuietHours } from "./quiet-hours";
 import { readAllowedShows } from "./shows";
 import { getPlayback, playOnDevice, skipNext } from "./spotify";
@@ -35,6 +34,9 @@ export async function runUserCheck(userId: string, opts?: { ignoreCooldown?: boo
 }
 
 async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }): Promise<CheckSummary> {
+  // Starts with the lock, so player calls end before the lock's TTL can lapse.
+  // Token refresh keeps its own longer timeout (accounts.ts).
+  const signal = AbortSignal.timeout(CHECK_TIMEOUT_MS);
   const bundle = await prisma.user.findUnique({
     where: { id: userId },
     include: { spotify: true, settings: true, poll: true },
@@ -74,17 +76,19 @@ async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }):
     kind: settings.replacementKind,
   };
 
-  const signal = AbortSignal.timeout(CHECK_TIMEOUT_MS);
   const playbackCall = await authorizedCall(spotify, (token) => getPlayback(token, signal));
   if (!playbackCall.ok) {
-    if (playbackCall.broken) return { outcome: "broken", detail: playbackCall.error };
+    if (playbackCall.broken) {
+      await markConnectionBroken(userId, bundle.email);
+      return { outcome: "broken", detail: playbackCall.error };
+    }
     await noteFailure(userId, playbackCall.error || "Spotify request failed");
     return { outcome: "error", detail: playbackCall.error };
   }
 
   const playback = toPlaybackResult(playbackCall.result);
   if (!playback.ok && playback.status === 429) {
-    return pauseForRateLimit(bundle.email, userId, playback.retryAfterSec, playback.reason === "QUOTA_EXCEEDED", poll);
+    return pauseForRateLimit(bundle.email, userId, playback.retryAfterSec, playback.reason === "QUOTA_EXCEEDED", poll, {});
   }
   if (!playback.ok) {
     await noteFailure(userId, `Spotify player returned ${playback.status || "a network error"}`);
@@ -96,34 +100,27 @@ async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }):
     blockAudiobooks: settings.blockAudiobooks,
   });
   const playing = describeNowPlaying(playback, decision.kind === "block");
-  await prisma.pollState.update({
-    where: { userId },
-    data: {
-      lastCheckedAt: now,
-      pausedUntil: null,
-      nowPlayingKind: playing.kind,
-      nowPlayingTitle: playing.title,
-      nowPlayingSubtitle: playing.subtitle,
-      nowPlayingArt: playing.art,
-    },
-  });
+  // Built up through the rest of the check and written once.
+  const seen: Prisma.PollStateUpdateInput = {
+    lastCheckedAt: now,
+    pausedUntil: null,
+    nowPlayingKind: playing.kind,
+    nowPlayingTitle: playing.title,
+    nowPlayingSubtitle: playing.subtitle,
+    nowPlayingArt: playing.art,
+  };
+  const healthy: Prisma.PollStateUpdateInput = { ...seen, consecutiveFailures: 0, lastError: null };
   if (spotify.status === "quota_paused") {
     await prisma.spotifyConnection.update({ where: { userId }, data: { status: "connected" } });
   }
 
   if (decision.kind === "ignored") {
-    await prisma.pollState.update({
-      where: { userId },
-      data: { consecutiveFailures: 0, lastError: null },
-    });
+    await writePoll(userId, healthy);
     return { outcome: decision.content === "audiobook" ? "ignored_audiobook" : "ignored_podcast" };
   }
 
   if (decision.kind !== "block") {
-    await prisma.pollState.update({
-      where: { userId },
-      data: { consecutiveFailures: 0, lastError: null },
-    });
+    await writePoll(userId, healthy);
     return { outcome: decision.kind };
   }
 
@@ -137,37 +134,39 @@ async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }):
       action: "skip",
       result: "allow_listed",
     });
-    await prisma.pollState.update({
-      where: { userId },
-      data: { consecutiveFailures: 0, lastError: null },
-    });
+    await writePoll(userId, healthy);
     return { outcome: "allow_listed", detail: decision.target.showName };
   }
 
   const fresh = await prisma.spotifyConnection.findUnique({ where: { userId } });
-  if (!fresh?.refreshTokenEnc) return { outcome: "broken" };
+  if (!fresh?.refreshTokenEnc) {
+    await writePoll(userId, seen);
+    return { outcome: "broken" };
+  }
 
   const play = await swapToReplacement(fresh, replacement, decision.target.deviceId, signal);
   if (play.kind === "rate_limited") {
-    return pauseForRateLimit(bundle.email, userId, play.retryAfterSec, play.quotaExceeded, poll);
+    return pauseForRateLimit(bundle.email, userId, play.retryAfterSec, play.quotaExceeded, poll, seen);
   }
-  if (play.kind === "broken") return { outcome: "broken", detail: play.detail };
+  if (play.kind === "broken") {
+    await writePoll(userId, seen);
+    await markConnectionBroken(userId, bundle.email);
+    return { outcome: "broken", detail: play.detail };
+  }
 
-  await prisma.pollState.update({
-    where: { userId },
-    data: {
-      cooldownUntil: play.replaced ? new Date(now.getTime() + COOLDOWN_MS) : undefined,
-      consecutiveFailures: play.replaced ? 0 : play.failed ? { increment: 1 } : undefined,
-      lastError: play.replaced ? null : play.detail ?? null,
-      ...(play.replaced
-        ? {
-            nowPlayingKind: replacement.kind,
-            nowPlayingTitle: play.result === "replaced" ? settings.replacementLabel : "Skipped ahead",
-            nowPlayingSubtitle: play.result === "replaced" ? "Replacement" : (decision.target.showName ?? null),
-            nowPlayingArt: play.result === "replaced" ? settings.replacementArt : null,
-          }
-        : {}),
-    },
+  await writePoll(userId, {
+    ...seen,
+    cooldownUntil: play.replaced ? new Date(now.getTime() + COOLDOWN_MS) : undefined,
+    consecutiveFailures: play.replaced ? 0 : play.failed ? { increment: 1 } : undefined,
+    lastError: play.replaced ? null : play.detail ?? null,
+    ...(play.replaced
+      ? {
+          nowPlayingKind: replacement.kind,
+          nowPlayingTitle: play.result === "replaced" ? settings.replacementLabel : "Skipped ahead",
+          nowPlayingSubtitle: play.result === "replaced" ? "Replacement" : (decision.target.showName ?? null),
+          nowPlayingArt: play.result === "replaced" ? settings.replacementArt : null,
+        }
+      : {}),
   });
 
   await logActivity({
@@ -212,9 +211,7 @@ async function swapToReplacement(
   | { kind: "broken"; detail: string }
 > {
   const body = playBodyFor(replacement);
-  const played = await authorizedCall(connection, (token) =>
-    playOnDevice({ token, deviceId, body, signal }),
-  );
+  const played = await authorizedCall(connection, (token) => playOnDevice({ token, deviceId, body, signal }));
   if (!played.ok) {
     if (played.broken) return { kind: "broken", detail: played.error };
     return {
@@ -301,27 +298,22 @@ async function pauseForRateLimit(
   retryAfterSec: number | undefined,
   quotaExceeded: boolean,
   poll: PollState,
+  seen: Prisma.PollStateUpdateInput,
 ): Promise<CheckSummary> {
   const until = new Date(Date.now() + retryPauseMs(retryAfterSec, quotaExceeded));
-  await prisma.pollState.update({
-    where: { userId },
-    data: {
-      pausedUntil: until,
-      lastCheckedAt: new Date(),
-      lastError: quotaExceeded ? "Spotify quota exceeded" : "Spotify rate limit",
-    },
+  const notify =
+    quotaExceeded && (!poll.quotaNotifiedAt || Date.now() - poll.quotaNotifiedAt.getTime() > 60 * 60 * 1000);
+  await writePoll(userId, {
+    ...seen,
+    pausedUntil: until,
+    lastCheckedAt: new Date(),
+    lastError: quotaExceeded ? "Spotify quota exceeded" : "Spotify rate limit",
+    ...(notify ? { quotaNotifiedAt: new Date() } : {}),
   });
   if (quotaExceeded) {
     await prisma.spotifyConnection.update({ where: { userId }, data: { status: "quota_paused" } });
-    if (!poll.quotaNotifiedAt || Date.now() - poll.quotaNotifiedAt.getTime() > 60 * 60 * 1000) {
-      await prisma.pollState.update({ where: { userId }, data: { quotaNotifiedAt: new Date() } });
-      try {
-        await notifyUser(email, "quota");
-      } catch (error) {
-        log.error("quota email failed", { message: error instanceof Error ? error.message : "unknown" });
-      }
-    }
   }
+  if (notify) await enqueueNotify(email, "quota");
   await logActivity({
     userId,
     action: "error",
@@ -346,6 +338,10 @@ async function noteFailure(userId: string, message: string): Promise<void> {
   if (updated.consecutiveFailures === FAILURE_WARN_AT) {
     log.info("blocker hit repeated failures", { userId, failures: updated.consecutiveFailures });
   }
+}
+
+async function writePoll(userId: string, data: Prisma.PollStateUpdateInput): Promise<void> {
+  await prisma.pollState.update({ where: { userId }, data });
 }
 
 async function touch(userId: string, data: { lastCheckedAt: Date; lastError: string | null }): Promise<void> {

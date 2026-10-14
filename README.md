@@ -78,7 +78,7 @@ Every interval (10–300 seconds, default 60):
 - Replace a podcast when podcast blocking is on, and an audiobook when audiobook blocking is on. Each switch is independent. Both start on.
 - If the device returns 403 or 404, try skip-next, then log the result.
 - Wait 15 seconds before considering that user again, so one episode is not swapped twice.
-- On `invalid_grant`, turn the blocker off and ask for a reconnect.
+- On `invalid_grant` with the newest refresh token, turn the blocker off and queue a reconnect email.
 - On HTTP 429, wait for `Retry-After`. A `QUOTA_EXCEEDED` body pauses that user for an hour. Other users keep their own jobs.
 
 Quiet hours skip the Spotify call. One allow list leaves a show or an audiobook playing.
