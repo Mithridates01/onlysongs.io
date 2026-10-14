@@ -2,7 +2,7 @@ import { FAILURE_WARN_AT } from "./blocker-logic";
 import { last4 } from "./crypto";
 import { prisma } from "./db";
 import { redirectUri } from "./env";
-import { readWorkerHeart } from "./jobs";
+import { readWorkerHeart } from "./redis";
 import { isQuietNow, parseQuietHours, startOfZonedDay } from "./quiet-hours";
 import { readAllowedShows } from "./shows";
 import type { ConnectionState, ReplacementView, StatusResponse } from "./types";

@@ -1,5 +1,5 @@
 import { json } from "@/lib/http";
-import { readWorkerHeart } from "@/lib/jobs";
+import { readWorkerHeart } from "@/lib/redis";
 
 // For an uptime monitor: 503 when no worker has written a heartbeat in 35s.
 // Kept apart from /api/health so a stopped worker never fails web deploys.

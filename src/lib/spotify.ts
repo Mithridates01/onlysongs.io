@@ -1,4 +1,4 @@
-import { classifyTokenError } from "./blocker-logic";
+import { classifyTokenError } from "./spotify-auth";
 import { log } from "./log";
 import type { ParsedSpotify, SpotifyKind } from "./spotify-uri";
 

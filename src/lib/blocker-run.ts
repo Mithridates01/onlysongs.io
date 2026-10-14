@@ -14,7 +14,8 @@ import {
   type Replacement,
 } from "./blocker-logic";
 import { prisma } from "./db";
-import { enqueueNotify, withUserLock } from "./jobs";
+import { enqueueNotify } from "./jobs";
+import { withUserLock } from "./redis";
 import { log } from "./log";
 import { isQuietNow, parseQuietHours } from "./quiet-hours";
 import { readAllowedShows } from "./shows";

@@ -6,9 +6,9 @@ async function main() {
   // Selects the worker's database pool size in src/lib/db.ts.
   process.env.PROCESS ||= "worker";
   const { Worker } = await import("bullmq");
-  const { QUEUE_NAME, beatWorkerHeart, reconcileSchedules, pruneOldActivity, redisConnection } = await import(
-    "../lib/jobs"
-  );
+  const { QUEUE_NAME, reconcileSchedules } = await import("../lib/jobs");
+  const { beatWorkerHeart, redisConnection } = await import("../lib/redis");
+  const { pruneOldActivity } = await import("../lib/activity");
   const { runUserCheck } = await import("../lib/blocker-run");
   const { notifyUser } = await import("../lib/mail");
   const { assertMailConfigured } = await import("../lib/env");

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { EndSessionsButton } from "@/components/EndSessionsButton";
 import { prisma } from "@/lib/db";
 import { currentSession } from "@/lib/http";
-import { readWorkerHeart } from "@/lib/jobs";
+import { readWorkerHeart } from "@/lib/redis";
 
 export default async function AdminPage() {
   const session = await currentSession();

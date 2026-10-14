@@ -8,7 +8,7 @@ beforeAll(async () => {
   applyTestEnv();
   assertTestEnv();
   const { prisma } = await import("../../src/lib/db");
-  const { getRedis } = await import("../../src/lib/jobs");
+  const { getRedis } = await import("../../src/lib/redis");
   await prisma.user.deleteMany();
   await getRedis().flushdb();
 });

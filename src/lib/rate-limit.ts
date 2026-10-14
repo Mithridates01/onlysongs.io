@@ -1,4 +1,4 @@
-import { getRedis } from "./jobs";
+import { getRedis } from "./redis";
 import { log } from "./log";
 
 export type Limit = { key: string; limit: number; windowMs: number };
