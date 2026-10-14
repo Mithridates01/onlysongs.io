@@ -15,11 +15,11 @@ The design doc covers the stack, the two processes, and the check path. Day-to-d
 | Auth | Email and password (bcrypt, cost 12). Session is an HttpOnly cookie signed with `jose` (HS256). |
 | Secrets at rest | AES-256-GCM. The key is `ENCRYPTION_KEY`. |
 | Mail | Nodemailer when `SMTP_HOST` is set. Otherwise the notice is a log line. |
-| Production edge | Caddy 2, Let's Encrypt, reverse proxy to the web process |
-| Packaging | One Docker image. `PROCESS=web` or `PROCESS=worker` selects the entrypoint. The worker bundle is built with esbuild. |
+| Hosting | Railway: web and worker services, Postgres, and Redis, defined in `.railway/railway.ts`. Railway terminates HTTPS. A self-hosted Compose stack with Caddy 2 and Let's Encrypt remains as an alternative. |
+| Packaging | One multi-stage Docker image with production dependencies only, run as the `node` user. `PROCESS=web` or `PROCESS=worker` selects the entrypoint, and a command passed to the container runs instead. Migrations run once per deploy (Railway pre-deploy, or `RUN_MIGRATIONS=1` under Compose). The worker bundle is built with esbuild. |
 | Tests | Vitest unit and integration suites, plus a Docker smoke script on `main`. Details are in [TESTING.md](../TESTING.md). |
 
-Local development does not run Caddy. `docker-compose.dev.yml` starts Postgres and Redis only. The web app is `npm run dev` and the worker is `npm run worker` (`tsx` on the TypeScript sources).
+Local development has no edge proxy. `docker-compose.dev.yml` starts Postgres and Redis only. The web app is `npm run dev` and the worker is `npm run worker` (`tsx` on the TypeScript sources).
 
 ## High-level design
 
@@ -59,10 +59,10 @@ Production. Playback devices are reached only through Spotify.
 flowchart TB
   listener[Browser]
   devices[Phone, laptop, car, speaker]
-  subgraph server [Docker Compose]
-    caddy[Caddy]
+  subgraph server [Railway project]
+    caddy[Railway edge, HTTPS]
     web[Next.js web]
-    worker[BullMQ worker]
+    worker[BullMQ worker x2]
     postgres[(Postgres 16)]
     redis[(Redis 7)]
   end
@@ -79,7 +79,7 @@ flowchart TB
   spotify --> devices
 ```
 
-Locally, drop Caddy. The browser talks to `next dev` on `127.0.0.1:3000`, and `tsx` runs the worker beside it. Postgres and Redis still come from Compose.
+Locally there is no edge proxy. The browser talks to `next dev` on `127.0.0.1:3000`, and `tsx` runs the worker beside it. Postgres and Redis still come from Compose.
 
 ## Check sequence
 

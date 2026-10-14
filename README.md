@@ -96,9 +96,40 @@ npm run test:integration
 
 ## Deploy
 
-The production stack is Caddy, the web app, the worker, Postgres, and Redis. Caddy obtains a Let's Encrypt certificate and proxies HTTPS to the app. Postgres and Redis are not published on the host.
+Production runs on Railway. A self-hosted VM with Docker Compose still works and is described after it.
 
-### Server
+### Railway
+
+`.railway/railway.ts` defines the project: Postgres, Redis, and the `web` and `worker` services, both built from this repo's `Dockerfile` on `main`. Railway terminates HTTPS, and the services reach Postgres and Redis over Railway's private network. Each deploy runs `prisma migrate deploy` once as a pre-deploy command. Web is health-checked on `/api/health`. The worker runs 2 replicas.
+
+```bash
+brew install railway
+railway login
+railway link                      # or create the project the first time
+railway config plan               # preview changes from .railway/railway.ts
+railway config apply              # apply them
+```
+
+Secrets are not in the config file. Set them once on the `web` service; the worker reads them from web:
+
+```bash
+railway variable set ENCRYPTION_KEY=<64 hex chars> --service web
+railway variable set APP_URL=https://<your domain> --service web
+railway variable set ADMIN_EMAIL=you@example.com --service web
+```
+
+Generate the encryption key fresh for production and never change it, or stored Spotify secrets will not decrypt. Each user's Spotify app needs the redirect URI `https://<your domain>/callback/spotify`.
+
+| Check | URL | Use |
+| --- | --- | --- |
+| Web | `/api/health` | Railway's deploy health check |
+| Worker | `/api/health/worker` | Uptime monitor; 503 when no worker heartbeat in 35 seconds |
+
+Turn on daily and weekly backups for the Postgres volume in the Railway dashboard (service → Backups). Logs: `railway logs --service worker`.
+
+### Self-hosted VM
+
+The self-hosted stack is Caddy, the web app, the worker, Postgres, and Redis. Caddy obtains a Let's Encrypt certificate and proxies HTTPS to the app. Postgres and Redis are not published on the host.
 
 Use a small Linux VM with Docker and Docker Compose. Open TCP 80 and 443. Point an A (or AAAA) record for your hostname at the server, for example `onlysongs.io`.
 
@@ -132,23 +163,21 @@ docker compose logs -f caddy web worker
 
 In the Spotify dashboard, set the redirect URI to `https://onlysongs.io/callback/spotify`, select Web API, then connect from the site.
 
-### Updates
+Updates:
 
 ```bash
 git pull
 docker compose up -d --build
 ```
 
-### Logs and health
+Logs and health:
 
 ```bash
 docker compose logs -f worker
 curl -fsS https://onlysongs.io/api/health
 ```
 
-### Backup
-
-The database volume is named `pgdata`. A logical backup is enough for this app:
+Backup: the database volume is named `pgdata`. A logical backup is enough for this app:
 
 ```bash
 docker compose exec postgres pg_dump -U blocker blocker > blocker.sql
