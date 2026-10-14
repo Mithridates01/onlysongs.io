@@ -10,7 +10,8 @@ async function main() {
     "../lib/jobs"
   );
   const { runUserCheck } = await import("../lib/blocker-run");
-  const { notifyUser } = await import("../lib/mail");
+  const { assertMailConfigured, notifyUser } = await import("../lib/mail");
+  assertMailConfigured();
   const { log } = await import("../lib/log");
 
   await reconcileSchedules();

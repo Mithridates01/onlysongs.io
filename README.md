@@ -61,10 +61,12 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `DATABASE_URL` | Local only | Postgres URL. Production Compose sets this itself. |
 | `REDIS_URL` | Local only | Redis URL. Production Compose sets this itself. |
 | `APP_URL` | Yes | Public origin, no trailing slash. Local: `http://127.0.0.1:3000`. Production: `https://your.domain`. |
-| `ENCRYPTION_KEY` | Yes | 32 bytes as 64 hex characters. Encrypts Spotify secrets at rest. |
+| `ENCRYPTION_KEY` | Yes | 32 bytes as 64 hex characters. The root key: HKDF derives separate keys from it for Spotify secrets at rest and for session cookies. |
+| `ENCRYPTION_KEY_PREVIOUS` | Rotation only | The old root key while rotating. Values under it still decrypt; `npm run reencrypt -- --apply` rewrites them under the new key. Rotating also signs everyone out. |
+| `SESSION_SECRET` | No | At least 32 characters. Signs session cookies instead of the key derived from `ENCRYPTION_KEY`. |
 | `ADMIN_EMAIL` | No | This address becomes the operator on sign-up or login. |
 | `APP_DOMAIN` | Production | Hostname only, such as `onlysongs.io`. Caddy requests a certificate for it. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | No | Mail when Spotify disconnects or the quota is exceeded. Without these, the notice is written to the log. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | With an `https://` `APP_URL` | Email verification, password reset, and Spotify notices. Web and worker refuse to start on an `https://` `APP_URL` without `SMTP_HOST`. Locally, point them at Mailpit (`127.0.0.1`, port `1025`) and read mail at `http://127.0.0.1:8025`. Without `SMTP_HOST`, each email is written to the log. |
 
 The redirect URI is always `${APP_URL}/callback/spotify`.
 
