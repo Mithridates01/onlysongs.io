@@ -4,7 +4,7 @@ A small web app that watches a Spotify account and, when a podcast episode is pl
 
 Spotify Premium is required. Each person brings their own Spotify developer app (Client ID and Client Secret). There is no shared Spotify app. Spotify's Development Mode caps each app at a handful of users, and playback control through the API requires Premium.
 
-The stack, the web and worker processes, and the runtime diagrams are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The stack, the web and worker processes, and the runtime diagrams are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). How the tests and CI are laid out is in [TESTING.md](TESTING.md).
 
 ## What you need
 
@@ -92,11 +92,7 @@ npm test
 npm run test:integration
 ```
 
-`npm test` is the unit suite: track, episode, chapter, a null item, 204, paused playback, 403, 404, 429, quiet hours, URI parsing, encryption, and token refresh. It needs no database.
-
-`npm run test:integration` needs the local Postgres and Redis from `docker compose -f docker-compose.dev.yml up -d`. It creates a database named `onlysongs_test` and uses Redis database 1, so the dev database `blocker` and the worker heartbeat on Redis database 0 stay untouched. Spotify HTTP is stubbed. The suite covers a track left alone, an episode replaced with the saved song, an allow-listed show, quiet hours, a 401 refresh, a revoked refresh token, the 403/404 skip-next fallback, a quota pause, overlapping checks, signup and login cookies, a signed-out status request, and turning the blocker on.
-
-GitHub Actions runs the typecheck and unit suite, then the integration suite, on every pull request and on `main`. A push to `main` also builds the Docker image and runs `scripts/smoke.sh`: health, signup, login, and a worker heartbeat. CI creates its own encryption key. Production `ENCRYPTION_KEY` values and Spotify app secrets are not part of the workflow.
+`npm test` needs no database. `npm run test:integration` needs the local Postgres and Redis from `docker compose -f docker-compose.dev.yml up -d`. What each suite covers, how CI is split, and where to add a test are in [TESTING.md](TESTING.md).
 
 ## Deploy
 
@@ -173,5 +169,6 @@ Keep that file somewhere other than the server. Restoring is `psql` into an empt
 - `src/lib` — Spotify client, blocker rules, encryption, sessions
 - `src/worker` — scheduled playback checks
 - `prisma` — schema and migrations
+- `tests` — unit tests and the Postgres/Redis integration suite. See `TESTING.md`.
 - `docker-compose.yml` — production stack
 - `docker-compose.dev.yml` — local Postgres and Redis only
