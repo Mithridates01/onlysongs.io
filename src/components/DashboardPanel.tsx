@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LocalTime } from "./LocalTime";
 import { useEffect, useState } from "react";
 import { outcomeLabel } from "@/lib/outcomes";
 import type { SearchHitView, StatusResponse } from "@/lib/types";
@@ -132,11 +133,21 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
           ? "Quiet hours are active, so podcasts and audiobooks are allowed until the window ends."
           : `Checking about every ${status.intervalSeconds} seconds. A blocked podcast or audiobook can play until the next check.`}
       </p>
-      {status.warnings.map((warning) => (
-        <p key={warning} className={warning.includes("Reconnect") ? "banner bad" : "banner"}>
-          {warning} {warning.includes("Reconnect") ? <Link href="/account">Open account</Link> : null}
-        </p>
-      ))}
+      {status.warnings.map((warning) => {
+        const reconnect = warning.text.includes("Reconnect");
+        return (
+          <p key={warning.text} className={reconnect ? "banner bad" : "banner"}>
+            {warning.text}
+            {warning.resumesAt ? (
+              <>
+                {" "}
+                <LocalTime iso={warning.resumesAt} />.
+              </>
+            ) : null}{" "}
+            {reconnect ? <Link href="/account">Open account</Link> : null}
+          </p>
+        );
+      })}
       {error ? <p className="error">{error}</p> : null}
       {message ? <p className="banner good">{message}</p> : null}
 
@@ -146,7 +157,9 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
             <div>
               <h2>Playback watch</h2>
               <ConnectionPill status={status.connection} />
-              <p className="help">Last check {status.lastCheckedAt ? new Date(status.lastCheckedAt).toLocaleString() : "has not run yet"}.</p>
+              <p className="help">
+                Last check <LocalTime iso={status.lastCheckedAt} fallback="has not run yet" />.
+              </p>
               {status.lastError ? <p className="help">{status.lastError}</p> : null}
             </div>
             <button

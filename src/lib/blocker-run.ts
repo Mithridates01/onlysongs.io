@@ -1,30 +1,24 @@
-import type { PollState, Prisma, SpotifyConnection } from "@prisma/client";
+import type { SpotifyConnection } from "@prisma/client";
 import { authorizedCall, markConnectionBroken } from "./accounts";
+import { FAILURE_WARN_AT, playBodyFor, playOutcome, type PlaybackResult, type PlayerBody, type Replacement } from "./blocker-logic";
 import {
-  COOLDOWN_MS,
-  FAILURE_WARN_AT,
-  classifyPlayback,
-  describeNowPlaying,
-  isAllowListed,
-  playBodyFor,
-  playOutcome,
-  retryPauseMs,
-  type PlaybackResult,
-  type PlayerBody,
-  type Replacement,
-} from "./blocker-logic";
+  decide,
+  preflight,
+  settleSwap,
+  type CheckResult,
+  type CheckState,
+  type CheckSummary,
+  type PlayerObservation,
+  type SwapOutcome,
+} from "./check-plan";
 import { prisma } from "./db";
 import { enqueueNotify } from "./jobs";
-import { withUserLock } from "./redis";
 import { log } from "./log";
-import { isQuietNow, parseQuietHours } from "./quiet-hours";
+import { withUserLock } from "./redis";
 import { readAllowedShows } from "./shows";
 import { getPlayback, playOnDevice, skipNext } from "./spotify";
 
-export type CheckSummary = {
-  outcome: string;
-  detail?: string;
-};
+export type { CheckOutcome, CheckSummary } from "./check-plan";
 
 const CHECK_TIMEOUT_MS = 10_000;
 
@@ -34,6 +28,8 @@ export async function runUserCheck(userId: string, opts?: { ignoreCooldown?: boo
   return locked;
 }
 
+// gather → preflight → read the player → decide → swap → settle → persist.
+// The decisions are pure (check-plan.ts); this function only does I/O.
 async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }): Promise<CheckSummary> {
   // Starts with the lock, so player calls end before the lock's TTL can lapse.
   // Token refresh keeps its own longer timeout (accounts.ts).
@@ -43,148 +39,37 @@ async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }):
     include: { spotify: true, settings: true, poll: true },
   });
   if (!bundle?.settings || !bundle.poll) return { outcome: "missing" };
-  const { settings, poll } = bundle;
-  const spotify = bundle.spotify;
   const now = new Date();
-
-  if (!settings.enabled) return { outcome: "disabled" };
-
-  if (poll.pausedUntil && poll.pausedUntil > now) {
-    return { outcome: "paused", detail: `Paused until ${poll.pausedUntil.toISOString()}` };
-  }
-
-  if (!opts?.ignoreCooldown && poll.cooldownUntil && poll.cooldownUntil > now) {
-    return { outcome: "cooldown" };
-  }
-
-  const quiet = parseQuietHours(settings.quietHours);
-  if (isQuietNow(quiet, settings.timeZone, now)) {
-    await touch(userId, { lastCheckedAt: now, lastError: null });
-    return { outcome: "quiet_hours" };
-  }
-
-  if (!spotify || spotify.status === "disconnected" || !spotify.refreshTokenEnc) {
-    return { outcome: "not_connected" };
-  }
-  if (spotify.status === "broken") return { outcome: "broken" };
-
-  if (!settings.replacementUri || !isReplacementKind(settings.replacementKind)) {
-    return { outcome: "no_replacement" };
-  }
-
-  const replacement: Replacement = {
-    uri: settings.replacementUri,
-    kind: settings.replacementKind,
+  const state: CheckState = {
+    settings: {
+      ...bundle.settings,
+      allowedShowIds: readAllowedShows(bundle.settings.allowedShowIds).map((show) => show.id),
+    },
+    poll: bundle.poll,
+    connection: bundle.spotify
+      ? { status: bundle.spotify.status, hasRefreshToken: Boolean(bundle.spotify.refreshTokenEnc) }
+      : null,
   };
 
-  const playbackCall = await authorizedCall(spotify, (token) => getPlayback(token, signal));
-  if (!playbackCall.ok) {
-    if (playbackCall.broken) {
-      await markConnectionBroken(userId, bundle.email);
-      return { outcome: "broken", detail: playbackCall.error };
-    }
-    await noteFailure(userId, playbackCall.error || "Spotify request failed");
-    return { outcome: "error", detail: playbackCall.error };
-  }
+  const gate = preflight(state, now, opts);
+  if (gate.kind === "stop") return persist(userId, bundle.email, gate.result);
 
-  const playback = toPlaybackResult(playbackCall.result);
-  if (!playback.ok && playback.status === 429) {
-    return pauseForRateLimit(bundle.email, userId, playback.retryAfterSec, playback.reason === "QUOTA_EXCEEDED", poll, {});
-  }
-  if (!playback.ok) {
-    await noteFailure(userId, `Spotify player returned ${playback.status || "a network error"}`);
-    return { outcome: "error", detail: `Player status ${playback.status}` };
-  }
-
-  const decision = classifyPlayback(playback, {
-    blockPodcasts: settings.blockPodcasts,
-    blockAudiobooks: settings.blockAudiobooks,
-  });
-  const playing = describeNowPlaying(playback, decision.kind === "block");
-  // Built up through the rest of the check and written once.
-  const seen: Prisma.PollStateUpdateInput = {
-    lastCheckedAt: now,
-    pausedUntil: null,
-    nowPlayingKind: playing.kind,
-    nowPlayingTitle: playing.title,
-    nowPlayingSubtitle: playing.subtitle,
-    nowPlayingArt: playing.art,
-  };
-  const healthy: Prisma.PollStateUpdateInput = { ...seen, consecutiveFailures: 0, lastError: null };
-  if (spotify.status === "quota_paused") {
-    await prisma.spotifyConnection.update({ where: { userId }, data: { status: "connected" } });
-  }
-
-  if (decision.kind === "ignored") {
-    await writePoll(userId, healthy);
-    return { outcome: decision.content === "audiobook" ? "ignored_audiobook" : "ignored_podcast" };
-  }
-
-  if (decision.kind !== "block") {
-    await writePoll(userId, healthy);
-    return { outcome: decision.kind };
-  }
-
-  const allowed = readAllowedShows(settings.allowedShowIds).map((show) => show.id);
-  if (isAllowListed(decision.target.showId, allowed)) {
-    await logActivity({
-      userId,
-      showName: decision.target.showName,
-      episodeName: decision.target.episodeName,
-      deviceName: decision.target.deviceName,
-      action: "skip",
-      result: "allow_listed",
-    });
-    await writePoll(userId, healthy);
-    return { outcome: "allow_listed", detail: decision.target.showName };
-  }
+  const observed = await readPlayer(bundle.spotify as SpotifyConnection, signal);
+  const plan = decide(observed, state, now);
+  if (!("kind" in plan)) return persist(userId, bundle.email, plan);
 
   const fresh = await prisma.spotifyConnection.findUnique({ where: { userId } });
   if (!fresh?.refreshTokenEnc) {
-    await writePoll(userId, seen);
-    return { outcome: "broken" };
+    return persist(userId, bundle.email, { summary: { outcome: "broken" }, poll: plan.seen });
   }
-
-  const play = await swapToReplacement(fresh, replacement, decision.target.deviceId, signal);
-  if (play.kind === "rate_limited") {
-    return pauseForRateLimit(bundle.email, userId, play.retryAfterSec, play.quotaExceeded, poll, seen);
-  }
-  if (play.kind === "broken") {
-    await writePoll(userId, seen);
-    await markConnectionBroken(userId, bundle.email);
-    return { outcome: "broken", detail: play.detail };
-  }
-
-  await writePoll(userId, {
-    ...seen,
-    cooldownUntil: play.replaced ? new Date(now.getTime() + COOLDOWN_MS) : undefined,
-    consecutiveFailures: play.replaced ? 0 : play.failed ? { increment: 1 } : undefined,
-    lastError: play.replaced ? null : play.detail ?? null,
-    ...(play.replaced
-      ? {
-          nowPlayingKind: replacement.kind,
-          nowPlayingTitle: play.result === "replaced" ? settings.replacementLabel : "Skipped ahead",
-          nowPlayingSubtitle: play.result === "replaced" ? "Replacement" : (decision.target.showName ?? null),
-          nowPlayingArt: play.result === "replaced" ? settings.replacementArt : null,
-        }
-      : {}),
-  });
-
-  await logActivity({
-    userId,
-    showName: decision.target.showName,
-    episodeName: decision.target.episodeName,
-    deviceName: decision.target.deviceName,
-    action: play.action,
-    result: play.result,
-    httpStatus: play.httpStatus,
-  });
-
-  return { outcome: play.result, detail: decision.target.episodeName ?? decision.target.showName };
+  const swap = await swapToReplacement(fresh, gate.replacement, plan.target.deviceId, signal);
+  return persist(userId, bundle.email, settleSwap(plan, swap, state, now));
 }
 
-function isReplacementKind(kind: string | null): kind is Replacement["kind"] {
-  return kind === "track" || kind === "playlist" || kind === "album";
+async function readPlayer(connection: SpotifyConnection, signal: AbortSignal): Promise<PlayerObservation> {
+  const call = await authorizedCall(connection, (token) => getPlayback(token, signal));
+  if (!call.ok) return call.broken ? { kind: "broken", error: call.error } : { kind: "error", error: call.error };
+  return { kind: "player", playback: toPlaybackResult(call.result) };
 }
 
 function toPlaybackResult(result: { status: number; body: unknown; retryAfterSec?: number; quotaExceeded: boolean }): PlaybackResult {
@@ -206,11 +91,7 @@ async function swapToReplacement(
   replacement: Replacement,
   deviceId: string | undefined,
   signal: AbortSignal,
-): Promise<
-  | { kind: "done"; action: string; result: string; httpStatus: number; replaced: boolean; failed: boolean; detail?: string }
-  | { kind: "rate_limited"; retryAfterSec?: number; quotaExceeded: boolean }
-  | { kind: "broken"; detail: string }
-> {
+): Promise<SwapOutcome> {
   const body = playBodyFor(replacement);
   const played = await authorizedCall(connection, (token) => playOnDevice({ token, deviceId, body, signal }));
   if (!played.ok) {
@@ -251,13 +132,14 @@ async function swapToReplacement(
   const current = await prisma.spotifyConnection.findUnique({ where: { userId: connection.userId } });
   if (!current) return { kind: "broken", detail: "Connection disappeared." };
 
+  const fallbackResult = first.status === 404 ? "no_device" : "restricted";
   const skipped = await authorizedCall(current, (token) => skipNext({ token, deviceId, signal }));
   if (!skipped.ok) {
     if (skipped.broken) return { kind: "broken", detail: skipped.error };
     return {
       kind: "done",
       action: "fallback_next",
-      result: first.status === 404 ? "no_device" : "restricted",
+      result: fallbackResult,
       httpStatus: skipped.status ?? first.status,
       replaced: false,
       failed: true,
@@ -271,8 +153,7 @@ async function swapToReplacement(
       quotaExceeded: skipped.result.quotaExceeded,
     };
   }
-  const nextOutcome = playOutcome(skipped.result.status);
-  if (nextOutcome === "ok") {
+  if (playOutcome(skipped.result.status) === "ok") {
     return {
       kind: "done",
       action: "fallback_next",
@@ -285,7 +166,7 @@ async function swapToReplacement(
   return {
     kind: "done",
     action: "fallback_next",
-    result: first.status === 404 ? "no_device" : "restricted",
+    result: fallbackResult,
     httpStatus: skipped.result.status || first.status,
     replaced: false,
     failed: false,
@@ -293,81 +174,37 @@ async function swapToReplacement(
   };
 }
 
-async function pauseForRateLimit(
-  email: string,
-  userId: string,
-  retryAfterSec: number | undefined,
-  quotaExceeded: boolean,
-  poll: PollState,
-  seen: Prisma.PollStateUpdateInput,
-): Promise<CheckSummary> {
-  const until = new Date(Date.now() + retryPauseMs(retryAfterSec, quotaExceeded));
-  const notify =
-    quotaExceeded && (!poll.quotaNotifiedAt || Date.now() - poll.quotaNotifiedAt.getTime() > 60 * 60 * 1000);
-  await writePoll(userId, {
-    ...seen,
-    pausedUntil: until,
-    lastCheckedAt: new Date(),
-    lastError: quotaExceeded ? "Spotify quota exceeded" : "Spotify rate limit",
-    ...(notify ? { quotaNotifiedAt: new Date() } : {}),
-  });
-  if (quotaExceeded) {
-    await prisma.spotifyConnection.update({ where: { userId }, data: { status: "quota_paused" } });
+// The one place a check writes: poll_state once, then the activity row, then
+// the broken-connection and quota-email side effects.
+async function persist(userId: string, email: string, result: CheckResult): Promise<CheckSummary> {
+  if (result.poll) {
+    const { failures, ...fields } = result.poll;
+    const updated = await prisma.pollState.update({
+      where: { userId },
+      data: {
+        ...fields,
+        ...(failures === "reset" ? { consecutiveFailures: 0 } : {}),
+        ...(failures === "increment" ? { consecutiveFailures: { increment: 1 } } : {}),
+      },
+    });
+    if (failures === "increment" && updated.consecutiveFailures === FAILURE_WARN_AT) {
+      log.info("blocker hit repeated failures", { userId, failures: updated.consecutiveFailures });
+    }
   }
-  if (notify) await enqueueNotify(email, "quota");
-  await logActivity({
-    userId,
-    action: "error",
-    result: quotaExceeded ? "quota" : "rate_limited",
-    httpStatus: 429,
-  });
-  return {
-    outcome: quotaExceeded ? "quota" : "rate_limited",
-    detail: `Paused until ${until.toISOString()}`,
-  };
-}
-
-async function noteFailure(userId: string, message: string): Promise<void> {
-  const updated = await prisma.pollState.update({
-    where: { userId },
-    data: {
-      consecutiveFailures: { increment: 1 },
-      lastCheckedAt: new Date(),
-      lastError: message.slice(0, 240),
-    },
-  });
-  if (updated.consecutiveFailures === FAILURE_WARN_AT) {
-    log.info("blocker hit repeated failures", { userId, failures: updated.consecutiveFailures });
+  if (result.activity) {
+    const { showName, episodeName, deviceName, httpStatus, ...entry } = result.activity;
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        ...entry,
+        showName: showName ?? null,
+        episodeName: episodeName ?? null,
+        deviceName: deviceName ?? null,
+        httpStatus: httpStatus ?? null,
+      },
+    });
   }
+  if (result.markBroken) await markConnectionBroken(userId, email);
+  if (result.notifyQuota) await enqueueNotify(email, "quota");
+  return result.summary;
 }
-
-async function writePoll(userId: string, data: Prisma.PollStateUpdateInput): Promise<void> {
-  await prisma.pollState.update({ where: { userId }, data });
-}
-
-async function touch(userId: string, data: { lastCheckedAt: Date; lastError: string | null }): Promise<void> {
-  await prisma.pollState.update({ where: { userId }, data });
-}
-
-async function logActivity(entry: {
-  userId: string;
-  showName?: string;
-  episodeName?: string;
-  deviceName?: string;
-  action: string;
-  result: string;
-  httpStatus?: number;
-}): Promise<void> {
-  await prisma.activityLog.create({
-    data: {
-      userId: entry.userId,
-      showName: entry.showName ?? null,
-      episodeName: entry.episodeName ?? null,
-      deviceName: entry.deviceName ?? null,
-      action: entry.action,
-      result: entry.result,
-      httpStatus: entry.httpStatus ?? null,
-    },
-  });
-}
-

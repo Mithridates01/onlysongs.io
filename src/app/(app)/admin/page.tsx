@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { EndSessionsButton } from "@/components/EndSessionsButton";
+import { LocalTime } from "@/components/LocalTime";
 import { prisma } from "@/lib/db";
 import { currentSession } from "@/lib/http";
 import { readWorkerHeart } from "@/lib/redis";
@@ -55,7 +56,9 @@ export default async function AdminPage() {
                 <td>{user.spotify?.status ?? "none"}</td>
                 <td>{user.settings?.enabled ? `On · ${user.settings.intervalSeconds}s` : "Off"}</td>
                 <td>{user.poll?.consecutiveFailures ?? 0}</td>
-                <td>{user.poll?.lastCheckedAt ? user.poll.lastCheckedAt.toLocaleString() : "—"}</td>
+                <td>
+                  <LocalTime iso={user.poll?.lastCheckedAt?.toISOString()} />
+                </td>
                 <td>{blocked.get(user.id) ?? 0}</td>
                 <td>
                   <EndSessionsButton userId={user.id} />
