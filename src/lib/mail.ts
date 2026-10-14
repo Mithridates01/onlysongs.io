@@ -1,15 +1,8 @@
 import nodemailer from "nodemailer";
-import { appUrl, isHttpsApp } from "./env";
+import { appUrl } from "./env";
 import { log } from "./log";
 
 export type Email = { subject: string; text: string };
-
-// A public deployment must be able to send verification and reset links.
-export function assertMailConfigured(): void {
-  if (isHttpsApp() && !process.env.SMTP_HOST?.trim()) {
-    throw new Error("SMTP_HOST must be set when APP_URL is https://. Verification and password-reset emails need it.");
-  }
-}
 
 export async function sendEmail(to: string, email: Email): Promise<void> {
   if (!process.env.SMTP_HOST) {

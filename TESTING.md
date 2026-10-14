@@ -132,7 +132,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on pull requests and on pushes 
 
 | Job | When | Steps |
 | --- | --- | --- |
-| Unit and typecheck | Every pull request and push to `dev` or `main` | `npm ci`, `npm run typecheck`, `npm test` |
+| Unit and typecheck | Every pull request and push to `dev` or `main` | `npm ci`, `npm run typecheck`, `npm test`, `npm run build` |
 | Integration | Every pull request and push to `dev` or `main` | Postgres 16 and Redis 7 service containers, then `npm run test:integration` |
 | Image smoke | Push to `dev` or `main` | `docker compose -f docker-compose.ci.yml up -d --build --wait`, then `scripts/smoke.sh` |
 

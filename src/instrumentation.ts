@@ -1,6 +1,6 @@
 // Runs once when the Next.js server starts.
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const { assertMailConfigured } = await import("./lib/mail");
+  const { assertMailConfigured } = await import("./lib/env");
   assertMailConfigured();
 }
