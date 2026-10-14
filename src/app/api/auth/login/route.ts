@@ -1,20 +1,13 @@
-import { nextPath, normalizeEmail, sessionFor, verifyLogin } from "@/lib/auth-actions";
+import { nextPath, sessionFor, verifyLogin } from "@/lib/auth-actions";
 import { json, requestIp } from "@/lib/http";
 import { MINUTE, rateLimit } from "@/lib/rate-limit";
+import { loginBody } from "@/lib/schemas";
 import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 
 export async function POST(request: Request) {
-  let body: { email?: unknown; password?: unknown } | null = null;
-  try {
-    body = (await request.json()) as { email?: unknown; password?: unknown };
-  } catch {
-    body = null;
-  }
-  const email = normalizeEmail(body?.email);
-  const password = typeof body?.password === "string" ? body.password : "";
-  if (!email || password.length < 8) {
-    return json({ error: "Email or password is wrong." }, 401);
-  }
+  const body = loginBody.safeParse(await request.json().catch(() => undefined));
+  if (!body.success) return json({ error: "Email or password is wrong." }, 401);
+  const { email, password } = body.data;
 
   // Per account (any IP), per account and IP, and per IP across accounts.
   const ip = requestIp(request);
