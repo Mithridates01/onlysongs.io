@@ -21,7 +21,8 @@ export function stubFetch(handler: (call: RecordedCall) => Response | Promise<Re
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : input instanceof URL ? input.toString() : String(input);
     const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-    const body = typeof init?.body === "string" ? init.body : null;
+    const body =
+      typeof init?.body === "string" ? init.body : init?.body instanceof URLSearchParams ? init.body.toString() : null;
     const authorization = new Headers(init?.headers).get("authorization");
     const call = { url, method, body, authorization };
     calls.push(call);

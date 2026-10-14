@@ -27,11 +27,13 @@ Two processes share one database and one Redis.
 
 The **web** process serves the pages and the JSON API. It owns signup, login, Spotify OAuth, settings, the dashboard, and the manual **Check now** action. Check now calls the same check function as the worker, in the web process, and ignores the 15-second cooldown.
 
-The **worker** process does not serve HTTP. On startup it reconciles BullMQ job schedulers with users who have the blocker enabled, writes a Redis heartbeat every 10 seconds, and deletes activity rows older than 90 days every 6 hours. A BullMQ worker consumes the `playback-checks` queue at concurrency 50. Each enabled user has one scheduler, `blocker-<userId>`, repeating every `intervalSeconds` (10–300, default 60).
+The **worker** process does not serve HTTP. On startup it reconciles BullMQ job schedulers with users who have the blocker enabled, and every 5 minutes it restores any scheduler that is missing or has the wrong interval. It writes a Redis heartbeat every 10 seconds, and deletes activity rows older than 90 days every 6 hours. A BullMQ worker consumes the `playback-checks` queue at concurrency 50. The same queue carries `notify` jobs, which send the Reconnect and quota emails outside any check. Unless `DATABASE_URL` sets `connection_limit`, the worker opens up to 20 Postgres connections and the web process up to 10. Each enabled user has one scheduler, `blocker-<userId>`, repeating every `intervalSeconds` (10–300, default 60).
 
 Spotify credentials belong to the user. The server stores the client secret and the OAuth tokens encrypted. The browser receives only the last four characters of the client id. Scopes are `user-read-playback-state`, `user-modify-playback-state`, and `user-read-currently-playing`. The redirect URI is `${APP_URL}/callback/spotify`.
 
-A check is skipped when the blocker is off, the user is inside a quota pause, the cooldown has not elapsed, quiet hours are active, Spotify is disconnected or broken, or no replacement is saved. Otherwise the worker reads `GET /v1/me/player`. Music, silence, and a paused player are left alone. A podcast is replaced when podcast blocking is on. An audiobook is replaced when audiobook blocking is on. Both settings start on. A chapter that Spotify returns as an episode still counts as an audiobook when the item has an audiobook parent or the playback context is an audiobook. One allow list matches either a show id or an audiobook id. The replacement is `PUT /v1/me/player/play` with a track URI or a playlist or album context. A 403 or 404 falls back to `POST /v1/me/player/next`. A Redis lock, `lock:check:<userId>`, stops two checks for the same user from overlapping. Each Spotify call has a 10-second timeout.
+A check is skipped when the blocker is off, the user is inside a quota pause, the cooldown has not elapsed, quiet hours are active, Spotify is disconnected or broken, or no replacement is saved. Otherwise the worker reads `GET /v1/me/player`. Music, silence, and a paused player are left alone. A podcast is replaced when podcast blocking is on. An audiobook is replaced when audiobook blocking is on. Both settings start on. A chapter that Spotify returns as an episode still counts as an audiobook when the item has an audiobook parent or the playback context is an audiobook. One allow list matches either a show id or an audiobook id. The replacement is `PUT /v1/me/player/play` with a track URI or a playlist or album context. A 403 or 404 falls back to `POST /v1/me/player/next`. A Redis lock, `lock:check:<userId>`, stops two checks for the same user from overlapping. It holds a random token for 12 seconds and is released only by its owner, with a compare-and-delete script. A check has 10 seconds from taking the lock for its player calls. A token refresh has its own 25-second timeout and is never cut short by the check, because Spotify can finish a refresh after the caller stops waiting and rotate the refresh token, and that new token would be lost.
+
+Token refresh is single-flight per user across web and worker. A refresh takes `lock:refresh:<userId>`, re-reads the connection, reuses an access token another process just stored, and otherwise refreshes with the newest refresh token. `authorizedCall` changes nothing but the stored tokens. When Spotify revokes access, the check marks the connection broken, turns the blocker off, and queues the email. Search and resolve only report the error.
 
 Accounts are independent. One user's 429 or revoked token does not stop the others. Ten consecutive failed checks surface a warning on the dashboard. The failure count resets when a check ends in music, idle, an allow-listed show, or a successful replacement.
 
@@ -90,7 +92,7 @@ sequenceDiagram
   participant Spotify
 
   Scheduler->>Worker: check userId
-  Worker->>Redis: SET lock:check:userId NX
+  Worker->>Redis: SET lock:check:userId token NX PX 12000
   Worker->>DB: user, settings, connection, poll state
   alt off, paused, cooling down, or quiet hours
     Worker->>DB: touch last check when quiet
@@ -103,7 +105,7 @@ sequenceDiagram
       Worker->>DB: now playing, clear failures
     end
   end
-  Worker->>Redis: release lock
+  Worker->>Redis: delete lock if it still holds token
 ```
 
 Turning the blocker on writes the scheduler and enqueues one immediate job. Turning it off removes the scheduler. **Check now** skips the queue and runs this sequence in the web process.

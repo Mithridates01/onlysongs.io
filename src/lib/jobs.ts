@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import { prisma } from "./db";
@@ -50,11 +51,14 @@ export function schedulerId(userId: string): string {
   return `blocker-${userId}`;
 }
 
+function everyMs(intervalSeconds: number): number {
+  return Math.max(10, intervalSeconds) * 1000;
+}
+
 export async function scheduleUser(userId: string, intervalSeconds: number): Promise<void> {
-  const every = Math.max(10, intervalSeconds) * 1000;
   await getQueue().upsertJobScheduler(
     schedulerId(userId),
-    { every },
+    { every: everyMs(intervalSeconds) },
     {
       name: "check",
       data: { userId },
@@ -75,24 +79,37 @@ export async function enqueueCheck(userId: string): Promise<void> {
   );
 }
 
-export async function reconcileSchedules(): Promise<void> {
+// At startup every schedule is rewritten. The periodic run only restores
+// schedules that are missing or have the wrong interval, for example after a
+// Redis blip while a user turned the blocker on.
+export async function reconcileSchedules(opts?: { onlyMissing?: boolean }): Promise<void> {
   const enabled = await prisma.blockerSettings.findMany({
     where: { enabled: true },
     select: { userId: true, intervalSeconds: true },
   });
   const keep = new Set(enabled.map((settings) => schedulerId(settings.userId)));
+  const current = new Map<string, number | undefined>();
+  let listed = false;
   try {
     const existing = await getQueue().getJobSchedulers();
+    listed = true;
     for (const job of existing) {
       const id = job.id ?? job.key;
-      if (id && !keep.has(id)) await getQueue().removeJobScheduler(id);
+      if (!id) continue;
+      if (!keep.has(id)) await getQueue().removeJobScheduler(id);
+      else current.set(id, job.every == null ? undefined : Number(job.every));
     }
   } catch (error) {
     log.error("could not list schedules", { message: error instanceof Error ? error.message : "unknown" });
   }
+  let restored = 0;
   for (const settings of enabled) {
+    if (opts?.onlyMissing && listed && current.get(schedulerId(settings.userId)) === everyMs(settings.intervalSeconds)) {
+      continue;
+    }
     try {
       await scheduleUser(settings.userId, settings.intervalSeconds);
+      restored++;
     } catch (error) {
       log.error("could not restore schedule", {
         userId: settings.userId,
@@ -100,7 +117,7 @@ export async function reconcileSchedules(): Promise<void> {
       });
     }
   }
-  log.info("schedules reconciled", { users: enabled.length });
+  if (!opts?.onlyMissing || restored > 0) log.info("schedules reconciled", { users: enabled.length, restored });
 }
 
 export async function trySchedule(userId: string, intervalSeconds: number, immediate: boolean): Promise<string | null> {
@@ -128,15 +145,69 @@ export async function pruneOldActivity(now = new Date()): Promise<number> {
   return result.count;
 }
 
+export const CHECK_LOCK_MS = 12_000;
+// Longer than the 25s refresh timeout in accounts.ts, so the lock outlives the refresh.
+const REFRESH_LOCK_MS = 30_000;
+const REFRESH_WAIT_MS = 8_000;
+
+// Deletes the lock only while it still holds this caller's token, so a check
+// that outlived its TTL cannot release a lock another check now owns.
+const RELEASE_LOCK = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
+
+async function acquireLock(key: string, ttlMs: number): Promise<string | null> {
+  const token = randomUUID();
+  const acquired = await getRedis().set(key, token, "PX", ttlMs, "NX");
+  return acquired === "OK" ? token : null;
+}
+
+async function releaseLock(key: string, token: string): Promise<void> {
+  await getRedis()
+    .eval(RELEASE_LOCK, 1, key, token)
+    .catch(() => undefined);
+}
+
 export async function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T | { busy: true }> {
-  const redis = getRedis();
   const key = `lock:check:${userId}`;
-  const acquired = await redis.set(key, "1", "PX", 12_000, "NX");
-  if (acquired !== "OK") return { busy: true };
+  const token = await acquireLock(key, CHECK_LOCK_MS);
+  if (!token) return { busy: true };
   try {
     return await fn();
   } finally {
-    await redis.del(key).catch(() => undefined);
+    await releaseLock(key, token);
+  }
+}
+
+// Waits for another process's refresh to finish instead of racing it.
+export async function withRefreshLock<T>(userId: string, fn: () => Promise<T>): Promise<T | { busy: true }> {
+  const key = `lock:refresh:${userId}`;
+  const deadline = Date.now() + REFRESH_WAIT_MS;
+  for (;;) {
+    const token = await acquireLock(key, REFRESH_LOCK_MS);
+    if (token) {
+      try {
+        return await fn();
+      } finally {
+        await releaseLock(key, token);
+      }
+    }
+    if (Date.now() >= deadline) return { busy: true };
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+export type NotifyKind = "broken" | "quota";
+
+// Mail goes through the queue so an SMTP stall never runs inside a check lock.
+export async function enqueueNotify(email: string, kind: NotifyKind): Promise<void> {
+  if (!email) return;
+  try {
+    await getQueue().add(
+      "notify",
+      { email, kind },
+      { attempts: 3, backoff: { type: "exponential", delay: 30_000 }, removeOnComplete: 50, removeOnFail: 50 },
+    );
+  } catch (error) {
+    log.error("could not queue email", { kind, message: error instanceof Error ? error.message : "unknown" });
   }
 }
 

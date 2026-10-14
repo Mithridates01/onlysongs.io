@@ -18,6 +18,7 @@ docker compose -f docker-compose.dev.yml up -d
 | `npm run test:integration` | Integration tests | Local Postgres 16 and Redis 7 |
 | `npm run typecheck` | `next typegen` and `tsc --noEmit` | None |
 | `bash scripts/smoke.sh` | Health, signup, login, signed-out status, worker heartbeat | The stack in `docker-compose.ci.yml` |
+| `npm run load-test -- --users 1000 --minutes 10` | Real worker against a fake Spotify with seeded users, then a pass/fail report | Local Postgres 16 and Redis 7 |
 
 `npm test` includes `tests/*.test.ts`. `npm run test:integration` includes `tests/integration/**/*.test.ts` via `vitest.integration.config.ts`. The two commands stay separate so the unit job can run with no database.
 
@@ -30,10 +31,13 @@ docker compose -f docker-compose.dev.yml up -d
 | `tests/quiet-hours.test.ts` | Quiet-hour windows and zoned midnight |
 | `tests/spotify-uri.test.ts` | `spotify:` URIs and `open.spotify.com` links |
 | `tests/crypto.test.ts` | AES-256-GCM round trip and a wrong key |
+| `tests/db-url.test.ts` | Default Postgres pool size per process |
 | `tests/integration/blocker-run.test.ts` | `runUserCheck` against Postgres, Redis, and stubbed Spotify |
 | `tests/integration/api.test.ts` | Signup, login, status, and enabling the blocker |
+| `tests/integration/concurrency.test.ts` | Lock ownership, single-flight token refresh, refresh timeout, queued email, schedule repair |
 | `tests/integration/global-setup.ts` | Creates `onlysongs_test` and applies migrations |
 | `scripts/smoke.sh` | Curl checks against a running image |
+| `scripts/load/` | Load-test runner, fake Spotify, seed, and simulated web traffic |
 | `.github/workflows/ci.yml` | Pull-request and `main` pipeline |
 
 ## Unit tests
@@ -91,6 +95,35 @@ Route handlers read the session from `next/headers`. The test supplies that cook
 5. Waits until Redis has `worker:heartbeat`.
 
 The script does not log into Spotify. On a laptop where `npm run dev` already owns port 3000, leave this stack to CI.
+
+## Load test
+
+The load test runs the real worker against many users at once, which is where races between checks show up. It needs no real Spotify accounts.
+
+`scripts/load/run.ts`:
+
+1. Creates the database `onlysongs_load` if it is missing, applies migrations, and flushes Redis database 2. It refuses any other database name or Redis index.
+2. Starts `fake-spotify.ts` on `127.0.0.1:4010`. The app is pointed at it with `SPOTIFY_FAKE_URL`, which `src/lib/spotify.ts` honors only when `ONLYSONGS_LOAD_TEST=1` and `NODE_ENV` is not `production`.
+3. Seeds N users with the blocker on. User n has client id `load-<n>`, and token expiry is spread over the token lifetime.
+4. Starts the worker (`src/worker/index.ts`) and `web-sim.ts`, which stands in for the web process by pressing Check now or searching for random users.
+5. Prints progress each minute, then a report, and writes it as JSON to `scripts/load/results/` (ignored by git). It exits 1 if the gate fails.
+
+The fake keeps state per user. Playback changes between a song, a podcast episode, an audiobook chapter, and nothing every 20–120 seconds, and stays a song for at least 20 seconds after a swap. Refresh tokens rotate on every refresh and the old one is rejected with `invalid_grant` at once. This is stricter than Spotify, on purpose. A small share of token calls stall for 13 seconds, longer than the 12-second check lock, and a few API calls return 429.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--users` | 1000 | Seeded users |
+| `--minutes` | 10 | Run length |
+| `--interval` | 60 | Check interval in seconds |
+| `--token-ttl` | 300 | Fake access-token lifetime in seconds. Shorter means more refreshes |
+| `--web-rate` | 2 | Simulated Check now and search actions per second |
+
+The gate counts two symptoms, and both must be 0:
+
+- **Double swaps.** Two plays for one user within 15 seconds, so two checks acted on the same episode.
+- **False broken connections.** The fake never revokes a user, so any connection marked broken is a false alarm.
+
+The report also shows causes (stale refresh tokens presented, overlapping player calls, stalled token calls), users behind schedule, and worker CPU and memory from `ps`.
 
 ## CI
 
