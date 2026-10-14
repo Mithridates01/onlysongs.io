@@ -1,4 +1,4 @@
-# Podcast Blocker
+# OnlySongs
 
 A small web app that watches a Spotify account and, when a podcast episode is playing, replaces it with a song, playlist, or album you picked. It runs on a server, so the same rule applies to a phone, laptop, car, or speaker.
 
@@ -61,7 +61,7 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `APP_URL` | Yes | Public origin, no trailing slash. Local: `http://127.0.0.1:3000`. Production: `https://your.domain`. |
 | `ENCRYPTION_KEY` | Yes | 32 bytes as 64 hex characters. Encrypts Spotify secrets at rest. |
 | `ADMIN_EMAIL` | No | This address becomes the operator on sign-up or login. |
-| `APP_DOMAIN` | Production | Hostname only, such as `blocker.example.com`. Caddy requests a certificate for it. |
+| `APP_DOMAIN` | Production | Hostname only, such as `onlysongs.io`. Caddy requests a certificate for it. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | No | Mail when Spotify disconnects or the quota is exceeded. Without these, the notice is written to the log. |
 
 The redirect URI is always `${APP_URL}/callback/spotify`.
@@ -97,19 +97,19 @@ The production stack is Caddy, the web app, the worker, Postgres, and Redis. Cad
 
 ### Server
 
-Use a small Linux VM with Docker and Docker Compose. Open TCP 80 and 443. Point an A (or AAAA) record for your hostname at the server, for example `blocker.example.com`.
+Use a small Linux VM with Docker and Docker Compose. Open TCP 80 and 443. Point an A (or AAAA) record for your hostname at the server, for example `onlysongs.io`.
 
 ```bash
-git clone https://github.com/Mithridates01/podcast-blocker.git
-cd podcast-blocker
+git clone https://github.com/Mithridates01/onlysongs.io.git
+cd onlysongs.io
 cp .env.example .env
 ```
 
 Edit `.env` on the server:
 
 ```bash
-APP_DOMAIN=blocker.example.com
-APP_URL=https://blocker.example.com
+APP_DOMAIN=onlysongs.io
+APP_URL=https://onlysongs.io
 ENCRYPTION_KEY=paste-a-new-64-hex-char-key
 ADMIN_EMAIL=you@example.com
 ```
@@ -127,7 +127,7 @@ The first start migrates the database, then serves the site. Watch the logs unti
 docker compose logs -f caddy web worker
 ```
 
-In the Spotify dashboard, set the redirect URI to `https://blocker.example.com/callback/spotify`, select Web API, then connect from the site.
+In the Spotify dashboard, set the redirect URI to `https://onlysongs.io/callback/spotify`, select Web API, then connect from the site.
 
 ### Updates
 
@@ -140,7 +140,7 @@ docker compose up -d --build
 
 ```bash
 docker compose logs -f worker
-curl -fsS https://blocker.example.com/api/health
+curl -fsS https://onlysongs.io/api/health
 ```
 
 ### Backup

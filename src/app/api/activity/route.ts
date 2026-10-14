@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     return new Response(toCsv(rows), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="podcast-blocker-activity.csv"',
+        "Content-Disposition": 'attachment; filename="onlysongs-activity.csv"',
         "Cache-Control": "no-store",
       },
     });

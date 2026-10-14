@@ -32,8 +32,8 @@ export function Shell({
     <div className="app">
       <header className="topbar">
         <Link href="/dashboard" className="brand">
-          <small>Spotify · music only</small>
-          <strong>Podcast Blocker</strong>
+          <small>onlysongs.io</small>
+          <strong>OnlySongs</strong>
         </Link>
         <nav className="nav">
           {LINKS.map(([href, label]) => (

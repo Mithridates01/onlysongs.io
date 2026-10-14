@@ -4,7 +4,7 @@ import { log } from "./log";
 
 export async function notifyUser(to: string, kind: "broken" | "quota"): Promise<void> {
   const subject =
-    kind === "broken" ? "Reconnect Spotify — Podcast Blocker" : "Spotify quota pause — Podcast Blocker";
+    kind === "broken" ? "Reconnect Spotify — OnlySongs" : "Spotify quota pause — OnlySongs";
   const text =
     kind === "broken"
       ? `Spotify revoked access, so the blocker is off.\n\nReconnect at ${appUrl()}/account`

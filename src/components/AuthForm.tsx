@@ -33,13 +33,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <main className="app">
       <Link href="/" className="brand">
-        <small>Spotify · music only</small>
-        <strong>Podcast Blocker</strong>
+        <small>onlysongs.io</small>
+        <strong>OnlySongs</strong>
       </Link>
       <h1 className="page-title" style={{ marginTop: 28 }}>
         {signup ? "Create your account" : "Welcome back"}
       </h1>
-      <p className="lede">{signup ? "Then you will connect a Spotify app that belongs to you." : "Sign in to the blocker running on this server."}</p>
+      <p className="lede">{signup ? "Then you will connect a Spotify app that belongs to you." : "Sign in to OnlySongs."}</p>
       <form onSubmit={submit} className="card" style={{ maxWidth: 460 }}>
         <label className="field">
           <span>Email</span>
