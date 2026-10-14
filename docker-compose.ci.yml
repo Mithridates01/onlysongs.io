@@ -1,0 +1,68 @@
+# Image smoke stack. Postgres and Redis stay on the compose network.
+# The encryption key below is a throwaway default so `docker compose down` can
+# parse this file. Generate a fresh key for a real run. Do not reuse it for a
+# deployed OnlySongs account.
+name: onlysongs-ci
+
+services:
+  web:
+    image: onlysongs-ci:local
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment: &app_env
+      DATABASE_URL: postgresql://blocker:blocker@postgres:5432/blocker
+      REDIS_URL: redis://redis:6379
+      APP_URL: http://127.0.0.1:3000
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-abababababababababababababababababababababababababababababababab}
+      PROCESS: web
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 25s
+
+  worker:
+    image: onlysongs-ci:local
+    environment:
+      <<: *app_env
+      PROCESS: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: blocker
+      POSTGRES_PASSWORD: blocker
+      POSTGRES_DB: blocker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blocker -d blocker"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

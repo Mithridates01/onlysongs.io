@@ -17,7 +17,7 @@ The design doc covers the stack, the two processes, and the check path. Day-to-d
 | Mail | Nodemailer when `SMTP_HOST` is set. Otherwise the notice is a log line. |
 | Production edge | Caddy 2, Let's Encrypt, reverse proxy to the web process |
 | Packaging | One Docker image. `PROCESS=web` or `PROCESS=worker` selects the entrypoint. The worker bundle is built with esbuild. |
-| Tests | Vitest. They exercise detection, token refresh, quiet hours, URI parsing, and encryption. They do not call Spotify. |
+| Tests | Vitest. Unit tests cover detection, token refresh, quiet hours, URI parsing, and encryption. Integration tests run the check and the auth routes against Postgres and Redis with Spotify HTTP stubbed. |
 
 Local development does not run Caddy. `docker-compose.dev.yml` starts Postgres and Redis only. The web app is `npm run dev` and the worker is `npm run worker` (`tsx` on the TypeScript sources).
 

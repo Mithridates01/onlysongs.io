@@ -89,9 +89,14 @@ Spotify does not push playback changes, so some of a podcast always plays before
 
 ```bash
 npm test
+npm run test:integration
 ```
 
-The unit tests cover track, episode, chapter, a null item, 204, paused playback, 403, 404, 429, and the token refresh path. They do not call Spotify.
+`npm test` is the unit suite: track, episode, chapter, a null item, 204, paused playback, 403, 404, 429, quiet hours, URI parsing, encryption, and token refresh. It needs no database.
+
+`npm run test:integration` needs the local Postgres and Redis from `docker compose -f docker-compose.dev.yml up -d`. It creates a database named `onlysongs_test` and uses Redis database 1, so the dev database `blocker` and the worker heartbeat on Redis database 0 stay untouched. Spotify HTTP is stubbed. The suite covers a track left alone, an episode replaced with the saved song, an allow-listed show, quiet hours, a 401 refresh, a revoked refresh token, the 403/404 skip-next fallback, a quota pause, overlapping checks, signup and login cookies, a signed-out status request, and turning the blocker on.
+
+GitHub Actions runs the typecheck and unit suite, then the integration suite, on every pull request and on `main`. A push to `main` also builds the Docker image and runs `scripts/smoke.sh`: health, signup, login, and a worker heartbeat. CI creates its own encryption key. Production `ENCRYPTION_KEY` values and Spotify app secrets are not part of the workflow.
 
 ## Deploy
 

@@ -144,6 +144,18 @@ export async function beatWorkerHeart(): Promise<void> {
   await getRedis().set(HEARTBEAT_KEY, new Date().toISOString(), "EX", 30);
 }
 
+export async function closeConnections(): Promise<void> {
+  if (queue) {
+    await queue.close();
+    queue = null;
+  }
+  const g = globalThis as RedisGlobal;
+  const client = g.__blockerRedis;
+  if (!client) return;
+  g.__blockerRedis = undefined;
+  await client.quit();
+}
+
 export async function readWorkerHeart(): Promise<{ online: boolean; heartbeatAt: string | null }> {
   try {
     const value = await getRedis().get(HEARTBEAT_KEY);

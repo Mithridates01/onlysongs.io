@@ -8,7 +8,9 @@
     "build:worker": "esbuild src/worker/index.ts --bundle --platform=node --packages=external --outfile=dist/worker.js --format=cjs",
     "start": "next start -H 0.0.0.0 -p 3000",
     "worker": "tsx src/worker/index.ts",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate"
@@ -28,9 +30,11 @@
   "devDependencies": {
     "@types/node": "^24.5.2",
     "@types/nodemailer": "^7.0.1",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "esbuild": "^0.25.10",
+    "pg": "^8.23.1",
     "prisma": "^6.16.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
