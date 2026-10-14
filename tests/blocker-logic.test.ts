@@ -19,6 +19,10 @@ function playing(body: PlayerBody): PlaybackResult {
   return { ok: true, status: 200, body };
 }
 
+const bothOn = { blockPodcasts: true, blockAudiobooks: true };
+const booksOff = { blockPodcasts: true, blockAudiobooks: false };
+const podcastsOff = { blockPodcasts: false, blockAudiobooks: true };
+
 const episodeItem = {
   type: "episode",
   uri: "spotify:episode:ep1",
@@ -34,7 +38,7 @@ describe("classifyPlayback", () => {
         currently_playing_type: "track",
         item: { type: "track", uri: "spotify:track:abc", name: "Under the Pressure" },
       }),
-      true,
+      bothOn,
     );
     expect(result.kind).toBe("music");
   });
@@ -47,7 +51,7 @@ describe("classifyPlayback", () => {
         device: { id: "phone", name: "iPhone" },
         item: episodeItem,
       }),
-      true,
+      bothOn,
     );
     expect(result.kind).toBe("block");
     if (result.kind === "block") {
@@ -60,8 +64,16 @@ describe("classifyPlayback", () => {
   });
 
   it("blocks an episode even when the playing type is missing", () => {
-    const result = classifyPlayback(playing({ is_playing: true, item: episodeItem }), false);
+    const result = classifyPlayback(playing({ is_playing: true, item: episodeItem }), booksOff);
     expect(result.kind).toBe("block");
+  });
+
+  it("leaves a podcast alone when podcast blocking is off", () => {
+    const result = classifyPlayback(
+      playing({ is_playing: true, currently_playing_type: "episode", item: episodeItem }),
+      { blockPodcasts: false, blockAudiobooks: false },
+    );
+    expect(result).toEqual({ kind: "ignored", content: "episode" });
   });
 
   it("blocks a chapter when audiobooks are on", () => {
@@ -70,7 +82,7 @@ describe("classifyPlayback", () => {
         is_playing: true,
         item: { type: "chapter", uri: "spotify:chapter:ch1", name: "Chapter 2", audiobook: { id: "book1", name: "The book" } },
       }),
-      true,
+      bothOn,
     );
     expect(result.kind).toBe("block");
     if (result.kind === "block") {
@@ -82,15 +94,37 @@ describe("classifyPlayback", () => {
   it("ignores a chapter when audiobooks are off", () => {
     const result = classifyPlayback(
       playing({ is_playing: true, item: { type: "chapter", uri: "spotify:chapter:ch1", name: "Chapter 2" } }),
-      false,
+      booksOff,
     );
-    expect(result.kind).toBe("ignored");
+    expect(result).toEqual({ kind: "ignored", content: "audiobook" });
+  });
+
+  it("treats an episode that belongs to an audiobook as an audiobook", () => {
+    const chapter = playing({
+      is_playing: true,
+      currently_playing_type: "episode",
+      context: { type: "audiobook", uri: "spotify:audiobook:book1" },
+      item: {
+        type: "episode",
+        uri: "spotify:episode:ch1",
+        name: "Chapter 2",
+        audiobook: { id: "book1", name: "The book", uri: "spotify:audiobook:book1" },
+      },
+    });
+    const blocked = classifyPlayback(chapter, podcastsOff);
+    expect(blocked.kind).toBe("block");
+    if (blocked.kind === "block") {
+      expect(blocked.target.kind).toBe("audiobook");
+      expect(blocked.target.showId).toBe("book1");
+      expect(blocked.target.showName).toBe("The book");
+    }
+    expect(classifyPlayback(chapter, booksOff)).toEqual({ kind: "ignored", content: "audiobook" });
   });
 
   it("blocks an audiobook uri", () => {
     const result = classifyPlayback(
       playing({ is_playing: true, item: { uri: "spotify:audiobook:book9", name: "A novel" } }),
-      true,
+      bothOn,
     );
     expect(result.kind).toBe("block");
   });
@@ -98,24 +132,24 @@ describe("classifyPlayback", () => {
   it("blocks when the item is null but the playing type is episode", () => {
     const result = classifyPlayback(
       playing({ is_playing: true, currently_playing_type: "episode", item: null, device: { name: "Car" } }),
-      true,
+      bothOn,
     );
     expect(result.kind).toBe("block");
     if (result.kind === "block") expect(result.target.episodeName).toBeUndefined();
   });
 
   it("does nothing for a null item that is not an episode", () => {
-    const result = classifyPlayback(playing({ is_playing: true, currently_playing_type: "track", item: null }), true);
+    const result = classifyPlayback(playing({ is_playing: true, currently_playing_type: "track", item: null }), bothOn);
     expect(result.kind).toBe("music");
   });
 
   it("treats 204 as idle", () => {
-    expect(classifyPlayback({ ok: true, status: 204 }, true).kind).toBe("idle");
+    expect(classifyPlayback({ ok: true, status: 204 }, bothOn).kind).toBe("idle");
     expect(classifyHttpStatus(204)).toBe("empty");
   });
 
   it("leaves a paused podcast alone", () => {
-    const result = classifyPlayback(playing({ is_playing: false, currently_playing_type: "episode", item: episodeItem }), true);
+    const result = classifyPlayback(playing({ is_playing: false, currently_playing_type: "episode", item: episodeItem }), bothOn);
     expect(result.kind).toBe("idle");
   });
 

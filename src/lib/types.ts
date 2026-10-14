@@ -14,6 +14,7 @@ export type QuietHoursView = { start: string; end: string } | null;
 export type StatusResponse = {
   blockerEnabled: boolean;
   intervalSeconds: number;
+  blockPodcasts: boolean;
   blockAudiobooks: boolean;
   timeZone: string;
   quietHours: QuietHoursView;

@@ -20,6 +20,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
   const browserZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const zones = ZONES.includes(browserZone) ? ZONES : [browserZone, ...ZONES];
   const [interval, setIntervalSeconds] = useState(initial.intervalSeconds);
+  const [podcasts, setPodcasts] = useState(initial.blockPodcasts);
   const [audiobooks, setAudiobooks] = useState(initial.blockAudiobooks);
   const [timeZone, setTimeZone] = useState(zones.includes(initial.timeZone) ? initial.timeZone : "UTC");
   const [quietOn, setQuietOn] = useState(Boolean(initial.quietHours));
@@ -43,6 +44,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         intervalSeconds: interval,
+        blockPodcasts: podcasts,
         blockAudiobooks: audiobooks,
         timeZone,
         quietHours: quietOn ? { start, end } : null,
@@ -116,8 +118,12 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
             />
           </label>
           <label className="row">
+            <input type="checkbox" checked={podcasts} onChange={(event) => setPodcasts(event.target.checked)} />
+            Block podcasts
+          </label>
+          <label className="row">
             <input type="checkbox" checked={audiobooks} onChange={(event) => setAudiobooks(event.target.checked)} />
-            Block audiobook chapters too
+            Block audiobooks
           </label>
           <label className="field">
             <span>Time zone for quiet hours and “today”</span>
@@ -134,7 +140,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
           <h2>Quiet hours</h2>
           <label className="row">
             <input type="checkbox" checked={quietOn} onChange={(event) => setQuietOn(event.target.checked)} />
-            Allow podcasts during a daily window
+            Allow podcasts and audiobooks during a daily window
           </label>
           <div className="row" style={{ marginTop: 12 }}>
             <label className="field">
@@ -150,8 +156,8 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
         </section>
         <section className="card">
           <h2>Allow list</h2>
-          <p className="help">These shows are left playing. Save after you add or remove one.</p>
-          {shows.length === 0 ? <p className="help">No shows yet.</p> : null}
+          <p className="help">One list for shows and audiobooks. A match is left playing. Save after you add or remove one.</p>
+          {shows.length === 0 ? <p className="help">Nothing on the list yet.</p> : null}
           <ul className="steps">
             {shows.map((show) => (
               <li key={show.id} className="spread">
@@ -198,7 +204,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
             <input
               className="inline-input"
               style={{ flex: 1 }}
-              placeholder="Paste a show or episode link"
+              placeholder="Paste a show, episode, or audiobook link"
               value={paste}
               onChange={(event) => setPaste(event.target.value)}
               onKeyDown={(event) => {

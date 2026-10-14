@@ -13,8 +13,14 @@ export type PlayerItem = {
 export type PlayerBody = {
   is_playing?: boolean;
   currently_playing_type?: string;
+  context?: { type?: string; uri?: string } | null;
   device?: { id?: string; name?: string } | null;
   item?: PlayerItem | null;
+};
+
+export type BlockRules = {
+  blockPodcasts: boolean;
+  blockAudiobooks: boolean;
 };
 
 export type PlaybackResult =
@@ -35,7 +41,7 @@ export type BlockTarget = {
 export type Classification =
   | { kind: "idle" }
   | { kind: "music" }
-  | { kind: "ignored" }
+  | { kind: "ignored"; content: "episode" | "audiobook" }
   | { kind: "block"; target: BlockTarget };
 
 export type Replacement = {
@@ -43,45 +49,71 @@ export type Replacement = {
   kind: "track" | "playlist" | "album";
 };
 
-export function classifyPlayback(result: PlaybackResult, blockAudiobooks: boolean): Classification {
+export function spokenKind(body: PlayerBody): "episode" | "audiobook" | null {
+  const item = body.item;
+  const uri = item?.uri ?? "";
+  const playingType = body.currently_playing_type ?? "";
+  const itemType = item?.type ?? "";
+  if (playingType === "track" || itemType === "track" || uri.startsWith("spotify:track:")) return null;
+  if (isAudiobook(body)) return "audiobook";
+
+  const contextUri = body.context?.uri ?? "";
+  const contextType = body.context?.type ?? "";
+  const podcast =
+    playingType === "episode" ||
+    itemType === "episode" ||
+    contextType === "show" ||
+    uri.startsWith("spotify:episode:") ||
+    contextUri.startsWith("spotify:show:") ||
+    Boolean(item?.show?.id || item?.show?.uri);
+  return podcast ? "episode" : null;
+}
+
+function isAudiobook(body: PlayerBody): boolean {
+  const item = body.item;
+  const uri = item?.uri ?? "";
+  const contextUri = body.context?.uri ?? "";
+  const playingType = body.currently_playing_type ?? "";
+  const itemType = item?.type ?? "";
+  const contextType = body.context?.type ?? "";
+  return (
+    playingType === "chapter" ||
+    playingType === "audiobook" ||
+    itemType === "chapter" ||
+    itemType === "audiobook" ||
+    contextType === "audiobook" ||
+    uri.startsWith("spotify:chapter:") ||
+    uri.startsWith("spotify:audiobook:") ||
+    contextUri.startsWith("spotify:audiobook:") ||
+    Boolean(item?.audiobook?.id || item?.audiobook?.uri)
+  );
+}
+
+export function classifyPlayback(result: PlaybackResult, rules: BlockRules): Classification {
   if (!result.ok) return { kind: "idle" };
   if (result.status === 204) return { kind: "idle" };
   const body = result.body;
   if (body.is_playing !== true) return { kind: "idle" };
 
-  const item = body.item ?? undefined;
-  const uri = item?.uri ?? "";
-  const itemType = item?.type ?? "";
-  const playingType = body.currently_playing_type ?? "";
+  const content = spokenKind(body);
+  if (!content) return { kind: "music" };
+  const enabled = content === "audiobook" ? rules.blockAudiobooks : rules.blockPodcasts;
+  if (!enabled) return { kind: "ignored", content };
 
-  const episode =
-    playingType === "episode" || itemType === "episode" || uri.startsWith("spotify:episode:");
-
-  const audiobook =
-    playingType === "chapter" ||
-    playingType === "audiobook" ||
-    itemType === "chapter" ||
-    itemType === "audiobook" ||
-    uri.startsWith("spotify:chapter:") ||
-    uri.startsWith("spotify:audiobook:");
-
-  if (!episode && !(audiobook && blockAudiobooks)) {
-    return audiobook ? { kind: "ignored" } : { kind: "music" };
-  }
-
-  const showName = item?.show?.name || item?.audiobook?.name || undefined;
-  const showId = item?.show?.id || showIdFromUri(item?.show?.uri) || item?.audiobook?.id || showIdFromUri(item?.audiobook?.uri);
+  const item = body.item;
+  const parent = content === "audiobook" ? item?.audiobook : item?.show;
+  const showId = parent?.id || showIdFromUri(parent?.uri) || contextId(body.context?.uri, content === "audiobook" ? "audiobook" : "show");
 
   return {
     kind: "block",
     target: {
-      kind: episode ? "episode" : "audiobook",
+      kind: content,
       showId,
-      showName,
+      showName: parent?.name,
       episodeName: item?.name,
       deviceId: body.device?.id || undefined,
       deviceName: body.device?.name || undefined,
-      uri: uri || undefined,
+      uri: item?.uri || undefined,
     },
   };
 }
@@ -89,6 +121,12 @@ export function classifyPlayback(result: PlaybackResult, blockAudiobooks: boolea
 function showIdFromUri(uri: string | undefined): string | undefined {
   if (!uri) return undefined;
   const match = /^spotify:(?:show|audiobook):([A-Za-z0-9]+)$/.exec(uri);
+  return match?.[1];
+}
+
+function contextId(uri: string | undefined, expected: "show" | "audiobook"): string | undefined {
+  if (!uri) return undefined;
+  const match = new RegExp(`^spotify:${expected}:([A-Za-z0-9]+)$`).exec(uri);
   return match?.[1];
 }
 
@@ -242,11 +280,13 @@ export function describeNowPlaying(result: PlaybackResult, blocked: boolean): {
   const art = item?.album?.images?.[0]?.url || item?.images?.[0]?.url || null;
   const artists = item?.artists?.map((artist) => artist.name).filter(Boolean).join(", ");
   const playingType = result.body.currently_playing_type;
-  if (blocked) {
+  const spoken = spokenKind(result.body);
+  if (spoken || blocked) {
+    const kind = spoken ?? "episode";
     return {
-      kind: playingType === "episode" || item?.type === "episode" ? "episode" : "audiobook",
-      title: item?.name ?? "Podcast",
-      subtitle: item?.show?.name || item?.audiobook?.name || null,
+      kind,
+      title: item?.name ?? (kind === "audiobook" ? "Audiobook" : "Podcast"),
+      subtitle: (kind === "audiobook" ? item?.audiobook?.name : item?.show?.name) || null,
       art,
     };
   }

@@ -30,8 +30,8 @@ export default async function HomePage() {
           <ol className="steps">
             <li>Every minute, the server asks Spotify what is playing.</li>
             <li>A song, a pause, or silence is left alone.</li>
-            <li>A podcast episode is replaced on the same device.</li>
-            <li>Audiobooks can be blocked too. Quiet hours and an allow list opt shows back in.</li>
+            <li>A podcast or an audiobook is replaced on the same device when that switch is on.</li>
+            <li>Quiet hours pause both. One allow list lets a show or an audiobook keep playing.</li>
           </ol>
         </section>
         <section className="card">

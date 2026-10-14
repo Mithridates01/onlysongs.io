@@ -1,4 +1,4 @@
-export type SpotifyKind = "track" | "playlist" | "album" | "show" | "episode";
+export type SpotifyKind = "track" | "playlist" | "album" | "show" | "episode" | "audiobook" | "chapter";
 
 export type ParsedSpotify = {
   kind: SpotifyKind;
@@ -6,13 +6,13 @@ export type ParsedSpotify = {
   uri: string;
 };
 
-const KINDS = new Set<SpotifyKind>(["track", "playlist", "album", "show", "episode"]);
+const KINDS = new Set<SpotifyKind>(["track", "playlist", "album", "show", "episode", "audiobook", "chapter"]);
 
 export function parseSpotifyUri(input: string): ParsedSpotify | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  const uri = /^spotify:(track|playlist|album|show|episode):([A-Za-z0-9]+)$/.exec(trimmed);
+  const uri = /^spotify:(track|playlist|album|show|episode|audiobook|chapter):([A-Za-z0-9]+)$/.exec(trimmed);
   if (uri && KINDS.has(uri[1] as SpotifyKind)) {
     const kind = uri[1] as SpotifyKind;
     return { kind, id: uri[2], uri: `spotify:${kind}:${uri[2]}` };

@@ -80,6 +80,8 @@ export async function seedListener(opts?: {
   enabled?: boolean;
   quietHours?: { start: string; end: string } | null;
   allowedShows?: { id: string; name: string }[];
+  blockPodcasts?: boolean;
+  blockAudiobooks?: boolean;
   failures?: number;
   expiresAt?: Date | null;
   withTokens?: boolean;
@@ -97,7 +99,8 @@ export async function seedListener(opts?: {
           replacementLabel: "Test Track",
           replacementKind: "track",
           timeZone: "UTC",
-          blockAudiobooks: true,
+          blockPodcasts: opts?.blockPodcasts ?? true,
+          blockAudiobooks: opts?.blockAudiobooks ?? true,
           allowedShowIds: opts?.allowedShows ?? [],
           ...(opts?.quietHours ? { quietHours: opts.quietHours } : { quietHours: Prisma.DbNull }),
         },

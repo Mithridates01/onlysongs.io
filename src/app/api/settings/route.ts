@@ -11,6 +11,7 @@ export async function GET() {
   return json({
     enabled: status.blockerEnabled,
     intervalSeconds: status.intervalSeconds,
+    blockPodcasts: status.blockPodcasts,
     blockAudiobooks: status.blockAudiobooks,
     timeZone: status.timeZone,
     quietHours: status.quietHours,
@@ -43,6 +44,7 @@ function readPatch(body: unknown): SettingsPatch | null {
   if ("intervalSeconds" in record) {
     patch.intervalSeconds = typeof record.intervalSeconds === "number" ? record.intervalSeconds : Number.NaN;
   }
+  if ("blockPodcasts" in record) patch.blockPodcasts = record.blockPodcasts === true;
   if ("blockAudiobooks" in record) patch.blockAudiobooks = record.blockAudiobooks === true;
   if ("timeZone" in record && typeof record.timeZone === "string") patch.timeZone = record.timeZone;
   if ("quietHours" in record) {

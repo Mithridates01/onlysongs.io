@@ -8,6 +8,7 @@ import type { AllowedShowView, ReplacementView } from "./types";
 export type SettingsPatch = {
   enabled?: boolean;
   intervalSeconds?: number;
+  blockPodcasts?: boolean;
   blockAudiobooks?: boolean;
   timeZone?: string;
   quietHours?: { start: string; end: string } | null;
@@ -34,6 +35,7 @@ export async function applySettings(
     data.intervalSeconds = patch.intervalSeconds;
   }
 
+  if (patch.blockPodcasts !== undefined) data.blockPodcasts = Boolean(patch.blockPodcasts);
   if (patch.blockAudiobooks !== undefined) data.blockAudiobooks = Boolean(patch.blockAudiobooks);
 
   if (patch.timeZone !== undefined) {
@@ -59,7 +61,7 @@ export async function applySettings(
 
   if (patch.allowedShows !== undefined) {
     if (!Array.isArray(patch.allowedShows) || patch.allowedShows.length > 40) {
-      return { ok: false, error: "The allow list can hold up to 40 shows.", status: 400 };
+      return { ok: false, error: "The allow list can hold up to 40 shows and audiobooks.", status: 400 };
     }
     const cleaned: AllowedShowView[] = [];
     for (const show of patch.allowedShows) {

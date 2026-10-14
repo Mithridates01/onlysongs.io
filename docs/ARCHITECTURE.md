@@ -31,7 +31,7 @@ The **worker** process does not serve HTTP. On startup it reconciles BullMQ job 
 
 Spotify credentials belong to the user. The server stores the client secret and the OAuth tokens encrypted. The browser receives only the last four characters of the client id. Scopes are `user-read-playback-state`, `user-modify-playback-state`, and `user-read-currently-playing`. The redirect URI is `${APP_URL}/callback/spotify`.
 
-A check is skipped when the blocker is off, the user is inside a quota pause, the cooldown has not elapsed, quiet hours are active, Spotify is disconnected or broken, or no replacement is saved. Otherwise the worker reads `GET /v1/me/player`. Music, silence, and a paused player are left alone. A podcast episode is replaced. An audiobook or chapter is replaced when that setting is on, which is the default. The replacement is `PUT /v1/me/player/play` with a track URI or a playlist or album context. A 403 or 404 falls back to `POST /v1/me/player/next`. A Redis lock, `lock:check:<userId>`, stops two checks for the same user from overlapping. Each Spotify call has a 10-second timeout.
+A check is skipped when the blocker is off, the user is inside a quota pause, the cooldown has not elapsed, quiet hours are active, Spotify is disconnected or broken, or no replacement is saved. Otherwise the worker reads `GET /v1/me/player`. Music, silence, and a paused player are left alone. A podcast is replaced when podcast blocking is on. An audiobook is replaced when audiobook blocking is on. Both settings start on. A chapter that Spotify returns as an episode still counts as an audiobook when the item has an audiobook parent or the playback context is an audiobook. One allow list matches either a show id or an audiobook id. The replacement is `PUT /v1/me/player/play` with a track URI or a playlist or album context. A 403 or 404 falls back to `POST /v1/me/player/next`. A Redis lock, `lock:check:<userId>`, stops two checks for the same user from overlapping. Each Spotify call has a 10-second timeout.
 
 Accounts are independent. One user's 429 or revoked token does not stop the others. Ten consecutive failed checks surface a warning on the dashboard. The failure count resets when a check ends in music, idle, an allow-listed show, or a successful replacement.
 
@@ -41,7 +41,7 @@ Accounts are independent. One user's 429 or revoked token does not stop the othe
 | --- | --- |
 | `users` | Email, password hash, admin flag |
 | `spotify_connections` | Encrypted client secret and tokens, OAuth state, connection status |
-| `blocker_settings` | Enabled flag, interval, replacement, audiobook setting, quiet hours, allow list, time zone |
+| `blocker_settings` | Enabled flag, interval, replacement, podcast and audiobook switches, quiet hours, allow list, time zone |
 | `poll_state` | Last check, cooldown, quota pause, failure count, now-playing snapshot |
 | `activity_log` | Swaps and skips. Newest first. Kept for 90 days. |
 
@@ -96,7 +96,7 @@ sequenceDiagram
     Worker->>DB: touch last check when quiet
   else ready
     Worker->>Spotify: GET /v1/me/player
-    alt episode, or audiobook when enabled
+    alt podcast or audiobook when that switch is on
       Worker->>Spotify: PUT play, or POST next on 403 or 404
       Worker->>DB: activity row, cooldown, now playing
     else music, idle, paused, or allow-listed

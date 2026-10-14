@@ -129,8 +129,8 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
       <h1 className="page-title">{status.blockerEnabled ? "Blocker is on" : "Blocker is off"}</h1>
       <p className="lede">
         {status.quietHoursActive
-          ? "Quiet hours are active, so a podcast is allowed until the window ends."
-          : `Checking about every ${status.intervalSeconds} seconds. A podcast can play until the next check.`}
+          ? "Quiet hours are active, so podcasts and audiobooks are allowed until the window ends."
+          : `Checking about every ${status.intervalSeconds} seconds. A blocked podcast or audiobook can play until the next check.`}
       </p>
       {status.warnings.map((warning) => (
         <p key={warning} className={warning.includes("Reconnect") ? "banner bad" : "banner"}>

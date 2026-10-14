@@ -16,6 +16,8 @@ describe("parseSpotifyUri", () => {
     expect(parseSpotifyUri("https://open.spotify.com/album/al1")).toMatchObject({ kind: "album", id: "al1" });
     expect(parseSpotifyUri("https://open.spotify.com/embed/show/sh1")).toMatchObject({ kind: "show", id: "sh1" });
     expect(parseSpotifyUri("https://open.spotify.com/episode/ep1")).toMatchObject({ kind: "episode", id: "ep1" });
+    expect(parseSpotifyUri("spotify:audiobook:book1")).toMatchObject({ kind: "audiobook", id: "book1" });
+    expect(parseSpotifyUri("https://open.spotify.com/chapter/ch1")).toMatchObject({ kind: "chapter", id: "ch1" });
   });
 
   it("rejects other hosts and junk", () => {

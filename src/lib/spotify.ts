@@ -296,6 +296,14 @@ function subtitleFor(type: string, item: Record<string, unknown>): string {
     const owner = item.owner as { display_name?: string } | undefined;
     return owner?.display_name ? `Playlist · ${owner.display_name}` : "Playlist";
   }
+  if (type === "audiobook") {
+    const authors = Array.isArray(item.authors) ? item.authors : [];
+    const names = authors
+      .map((author) => (author && typeof author === "object" ? (author as { name?: string }).name : ""))
+      .filter(Boolean)
+      .join(", ");
+    return names ? `Audiobook · ${names}` : "Audiobook";
+  }
   const publisher = typeof item.publisher === "string" ? item.publisher : "";
   return publisher ? `Show · ${publisher}` : "Show";
 }
@@ -314,12 +322,31 @@ export async function resolveCatalogItem(opts: {
   fetchImpl?: FetchLike;
 }): Promise<{ ok: true; hit: SearchHit } | { ok: false; status: number; error: string }> {
   const { parsed } = opts;
-  if (parsed.kind === "episode") {
-    const episode = await apiRequest({ path: `/episodes/${parsed.id}`, token: opts.token, fetchImpl: opts.fetchImpl });
+  if (parsed.kind === "episode" || parsed.kind === "chapter") {
+    const path = parsed.kind === "chapter" ? `/chapters/${parsed.id}` : `/episodes/${parsed.id}`;
+    const episode = await apiRequest({ path, token: opts.token, fetchImpl: opts.fetchImpl });
     if (episode.status !== 200 || !episode.body || typeof episode.body !== "object") {
       return { ok: false, status: episode.status, error: "Could not find that episode." };
     }
-    const show = (episode.body as { show?: { id?: string; uri?: string; name?: string; publisher?: string; images?: SpotifyImage[] } }).show;
+    const record = episode.body as {
+      show?: { id?: string; uri?: string; name?: string; publisher?: string; images?: SpotifyImage[] };
+      audiobook?: { id?: string; uri?: string; name?: string; authors?: { name?: string }[]; images?: SpotifyImage[] };
+    };
+    if (record.audiobook?.id && record.audiobook.name) {
+      const authors = (record.audiobook.authors ?? []).map((author) => author.name).filter(Boolean).join(", ");
+      return {
+        ok: true,
+        hit: {
+          id: record.audiobook.id,
+          uri: record.audiobook.uri || `spotify:audiobook:${record.audiobook.id}`,
+          kind: "show",
+          title: record.audiobook.name,
+          subtitle: authors ? `Audiobook · ${authors}` : "Audiobook",
+          art: imageUrl(record.audiobook.images),
+        },
+      };
+    }
+    const show = record.show;
     if (!show?.id || !show.uri || !show.name) {
       return { ok: false, status: 404, error: "That episode has no show." };
     }
@@ -343,7 +370,9 @@ export async function resolveCatalogItem(opts: {
         ? `/playlists/${parsed.id}`
         : parsed.kind === "album"
           ? `/albums/${parsed.id}`
-          : `/shows/${parsed.id}`;
+          : parsed.kind === "audiobook"
+            ? `/audiobooks/${parsed.id}`
+            : `/shows/${parsed.id}`;
   const result = await apiRequest({ path, token: opts.token, fetchImpl: opts.fetchImpl });
   if (result.status !== 200 || !result.body || typeof result.body !== "object") {
     return { ok: false, status: result.status, error: "Spotify could not find that link." };

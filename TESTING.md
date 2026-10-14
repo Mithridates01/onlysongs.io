@@ -43,9 +43,9 @@ These import the library functions and pass fixtures in memory. They open no soc
 `tests/blocker-logic.test.ts` checks the rules a future change is most likely to break:
 
 - A track, a paused player, HTTP 204, and a null item that is not an episode stay idle or music.
-- An episode is blocked from `currently_playing_type`, from `item.type`, or from a `spotify:episode:` URI.
-- A chapter or audiobook is blocked when that setting is on, and ignored when it is off.
-- An allow-listed show id is left playing.
+- A podcast episode is blocked from `currently_playing_type`, from `item.type`, or from a `spotify:episode:` URI, and left alone when podcast blocking is off.
+- An audiobook is recognized from a chapter type, an audiobook URI, an `audiobook` parent, or an audiobook playback context, including when Spotify labels the chapter as an episode. It is blocked only when audiobook blocking is on.
+- One allow list matches the show id or the audiobook id.
 - A track sends `{ uris }`. A playlist or album sends `{ context_uri }`.
 - Play outcomes: 204 succeeds, 403 and 404 fall back to skip-next.
 - Retry-After is honored. `QUOTA_EXCEEDED` pauses for one hour.
@@ -64,6 +64,7 @@ Spotify is stubbed by replacing `globalThis.fetch` for the length of each test. 
 
 - A playing track is left alone, nothing is written to the activity log, and an earlier failure count is cleared.
 - A playing episode is replaced with the saved track on the same device. The activity row is `swap` / `replaced`, and the cooldown is about 15 seconds.
+- A podcast is left playing when podcast blocking is off. An audiobook chapter that arrives as an episode is still replaced when audiobook blocking is on.
 - An allow-listed show is left playing and logged as `skip` / `allow_listed`.
 - Quiet hours return `quiet_hours` and make no Spotify call. The failure count stays as it was.
 - A 401 refreshes once. The retry uses the new access token, and the stored refresh token is unchanged. A second 401 marks the connection broken and turns the blocker off. `invalid_grant` does the same and never reads the player.

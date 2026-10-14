@@ -22,8 +22,14 @@ export async function POST(request: Request) {
   if (purpose === "replacement" && parsed.kind !== "track" && parsed.kind !== "playlist" && parsed.kind !== "album") {
     return json({ error: "Pick a track, playlist, or album." }, 400);
   }
-  if (purpose === "show" && parsed.kind !== "show" && parsed.kind !== "episode") {
-    return json({ error: "Paste a Spotify show or episode link." }, 400);
+  if (
+    purpose === "show" &&
+    parsed.kind !== "show" &&
+    parsed.kind !== "episode" &&
+    parsed.kind !== "audiobook" &&
+    parsed.kind !== "chapter"
+  ) {
+    return json({ error: "Paste a Spotify show, episode, or audiobook link." }, 400);
   }
 
   const connection = await prisma.spotifyConnection.findUnique({ where: { userId: user.id } });

@@ -292,6 +292,54 @@ describe("runUserCheck against Postgres and Redis", () => {
     }
   });
 
+  it("leaves a podcast playing when podcast blocking is off", async () => {
+    const user = await seedListener({ blockPodcasts: false, blockAudiobooks: true });
+    created.push(user.id);
+    const spotify = stubFetch((call) =>
+      spotifyRoute(call, { player: () => jsonResponse(200, episodePlayback()) }),
+    );
+    try {
+      const summary = await runUserCheck(user.id);
+      expect(summary.outcome).toBe("ignored_podcast");
+      expect(spotify.calls).toHaveLength(1);
+      expect(await prisma.activityLog.count({ where: { userId: user.id } })).toBe(0);
+    } finally {
+      spotify.restore();
+    }
+  });
+
+  it("replaces an audiobook chapter that arrives as an episode", async () => {
+    const user = await seedListener({ blockPodcasts: false, blockAudiobooks: true });
+    created.push(user.id);
+    const spotify = stubFetch((call) =>
+      spotifyRoute(call, {
+        player: () =>
+          jsonResponse(200, {
+            is_playing: true,
+            currently_playing_type: "episode",
+            context: { type: "audiobook", uri: "spotify:audiobook:book1" },
+            device: { id: "device1", name: "Phone" },
+            item: {
+              type: "episode",
+              name: "Chapter 2",
+              uri: "spotify:episode:chapter2",
+              audiobook: { id: "book1", name: "The book", uri: "spotify:audiobook:book1" },
+            },
+          }),
+        play: () => emptyResponse(204),
+      }),
+    );
+    try {
+      const summary = await runUserCheck(user.id);
+      expect(summary.outcome).toBe("replaced");
+      const activity = await prisma.activityLog.findFirstOrThrow({ where: { userId: user.id } });
+      expect(activity.showName).toBe("The book");
+      expect(activity.episodeName).toBe("Chapter 2");
+    } finally {
+      spotify.restore();
+    }
+  });
+
   it("returns busy when a second check overlaps the Redis lock", async () => {
     const user = await seedListener();
     created.push(user.id);

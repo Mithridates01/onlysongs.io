@@ -48,6 +48,7 @@ model BlockerSettings {
   replacementLabel String? @map("replacement_label")
   replacementArt   String? @map("replacement_art")
   replacementKind  String? @map("replacement_kind")
+  blockPodcasts    Boolean @default(true) @map("block_podcasts")
   blockAudiobooks  Boolean @default(true) @map("block_audiobooks")
   quietHours       Json?   @map("quiet_hours")
   allowedShowIds   Json    @default("[]") @map("allowed_show_ids")

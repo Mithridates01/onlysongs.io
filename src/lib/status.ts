@@ -69,6 +69,7 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
   return {
     blockerEnabled: settings.enabled,
     intervalSeconds: settings.intervalSeconds,
+    blockPodcasts: settings.blockPodcasts,
     blockAudiobooks: settings.blockAudiobooks,
     timeZone: settings.timeZone,
     quietHours: quiet ? { start: quiet.start, end: quiet.end } : null,

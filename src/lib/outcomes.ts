@@ -9,11 +9,14 @@ export function outcomeLabel(outcome: string): string {
     case "music":
       return "Music is playing. Left it alone.";
     case "ignored":
+    case "ignored_audiobook":
       return "An audiobook is playing. Audiobook blocking is off, so it was left alone.";
+    case "ignored_podcast":
+      return "A podcast is playing. Podcast blocking is off, so it was left alone.";
     case "allow_listed":
-      return "That show is on the allow list.";
+      return "That show or audiobook is on the allow list.";
     case "quiet_hours":
-      return "Quiet hours are active, so podcasts are allowed right now.";
+      return "Quiet hours are active, so podcasts and audiobooks are allowed right now.";
     case "cooldown":
       return "Cooling down after the last swap.";
     case "paused":

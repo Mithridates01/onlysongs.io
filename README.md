@@ -75,13 +75,13 @@ Every interval (10–300 seconds, default 60):
 - Refresh the access token if it expires within 60 seconds.
 - Read `GET /v1/me/player?additional_types=track,episode`.
 - Do nothing when playback is stopped, paused, or is a normal track.
-- Replace an episode on the same device. Audiobook chapters are included unless you turn that off.
+- Replace a podcast when podcast blocking is on, and an audiobook when audiobook blocking is on. Each switch is independent. Both start on.
 - If the device returns 403 or 404, try skip-next, then log the result.
 - Wait 15 seconds before considering that user again, so one episode is not swapped twice.
 - On `invalid_grant`, turn the blocker off and ask for a reconnect.
 - On HTTP 429, wait for `Retry-After`. A `QUOTA_EXCEEDED` body pauses that user for an hour. Other users keep their own jobs.
 
-Quiet hours skip the Spotify call. Allow-listed shows are left playing.
+Quiet hours skip the Spotify call. One allow list leaves a show or an audiobook playing.
 
 Spotify does not push playback changes, so some of a podcast always plays before the swap. At 60 seconds that is about 30 seconds on average.
 

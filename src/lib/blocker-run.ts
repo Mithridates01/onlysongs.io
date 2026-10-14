@@ -91,7 +91,10 @@ async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }):
     return { outcome: "error", detail: `Player status ${playback.status}` };
   }
 
-  const decision = classifyPlayback(playback, settings.blockAudiobooks);
+  const decision = classifyPlayback(playback, {
+    blockPodcasts: settings.blockPodcasts,
+    blockAudiobooks: settings.blockAudiobooks,
+  });
   const playing = describeNowPlaying(playback, decision.kind === "block");
   await prisma.pollState.update({
     where: { userId },
@@ -106,6 +109,14 @@ async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }):
   });
   if (spotify.status === "quota_paused") {
     await prisma.spotifyConnection.update({ where: { userId }, data: { status: "connected" } });
+  }
+
+  if (decision.kind === "ignored") {
+    await prisma.pollState.update({
+      where: { userId },
+      data: { consecutiveFailures: 0, lastError: null },
+    });
+    return { outcome: decision.content === "audiobook" ? "ignored_audiobook" : "ignored_podcast" };
   }
 
   if (decision.kind !== "block") {
