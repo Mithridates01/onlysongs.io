@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { openSpotifyDashboard, SPOTIFY_DASHBOARD_URL, spotifyDashboardAlreadyOpened } from "@/lib/links";
+import { SPOTIFY_DASHBOARD_URL, openSpotifyDashboard, spotifyDashboardAlreadyOpened, startSpotifyConnect } from "@/lib/links";
 import { CopyButton } from "./CopyButton";
 
 const ERRORS: Record<string, string> = {
@@ -114,9 +114,9 @@ export function OnboardingForm({
                 {pending ? "Saving…" : "Save credentials"}
               </button>
               {saved ? (
-                <a className="btn" href="/api/spotify/connect">
+                <button className="btn" type="button" onClick={startSpotifyConnect}>
                   Connect Spotify
-                </a>
+                </button>
               ) : (
                 <button className="btn" type="button" disabled>
                   Connect Spotify

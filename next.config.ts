@@ -13,7 +13,8 @@ const contentSecurityPolicy = [
   `connect-src 'self'${isDev ? " ws:" : ""}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  // The Connect Spotify form posts here, then redirects to Spotify's sign-in.
+  "form-action 'self' https://accounts.spotify.com",
   "object-src 'none'",
 ].join("; ");
 

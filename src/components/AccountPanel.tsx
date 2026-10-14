@@ -94,9 +94,11 @@ export function AccountPanel({ initial }: { initial: StatusResponse }) {
             <CopyButton value={initial.redirectUri} />
           </div>
           <div className="row">
-            <a className="btn" href="/api/spotify/connect">
-              Reconnect Spotify
-            </a>
+            <form method="post" action="/api/spotify/connect">
+              <button className="btn" type="submit">
+                Reconnect Spotify
+              </button>
+            </form>
             <button className="btn ghost" type="button" onClick={disconnect} disabled={pending}>
               Disconnect
             </button>
