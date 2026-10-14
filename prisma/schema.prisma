@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  isAdmin      Boolean  @default(false) @map("is_admin")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  spotify  SpotifyConnection?
+  settings BlockerSettings?
+  activity ActivityLog[]
+  poll     PollState?
+
+  @@map("users")
+}
+
+model SpotifyConnection {
+  userId              String    @id @map("user_id")
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId            String    @map("client_id")
+  clientSecretEnc     String    @map("client_secret_enc")
+  accessTokenEnc      String?   @map("access_token_enc")
+  refreshTokenEnc     String?   @map("refresh_token_enc")
+  expiresAt           DateTime? @map("expires_at")
+  spotifyUserId       String?   @map("spotify_user_id")
+  status              String    @default("pending")
+  codeVerifierEnc     String?   @map("code_verifier_enc")
+  oauthState          String?   @map("oauth_state")
+  oauthStateExpiresAt DateTime? @map("oauth_state_expires_at")
+
+  @@map("spotify_connections")
+}
+
+model BlockerSettings {
+  userId           String  @id @map("user_id")
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled          Boolean @default(false)
+  intervalSeconds  Int     @default(60) @map("interval_seconds")
+  replacementUri   String? @map("replacement_uri")
+  replacementLabel String? @map("replacement_label")
+  replacementArt   String? @map("replacement_art")
+  replacementKind  String? @map("replacement_kind")
+  blockAudiobooks  Boolean @default(true) @map("block_audiobooks")
+  quietHours       Json?   @map("quiet_hours")
+  allowedShowIds   Json    @default("[]") @map("allowed_show_ids")
+  timeZone         String  @default("UTC") @map("time_zone")
+
+  @@map("blocker_settings")
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  at          DateTime @default(now())
+  showName    String?  @map("show_name")
+  episodeName String?  @map("episode_name")
+  deviceName  String?  @map("device_name")
+  action      String
+  result      String
+  httpStatus  Int?     @map("http_status")
+
+  @@index([userId, at])
+  @@map("activity_log")
+}
+
+model PollState {
+  userId              String    @id @map("user_id")
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastCheckedAt       DateTime? @map("last_checked_at")
+  cooldownUntil       DateTime? @map("cooldown_until")
+  pausedUntil         DateTime? @map("paused_until")
+  consecutiveFailures Int       @default(0) @map("consecutive_failures")
+  lastError           String?   @map("last_error")
+  nowPlayingKind      String?   @map("now_playing_kind")
+  nowPlayingTitle     String?   @map("now_playing_title")
+  nowPlayingSubtitle  String?   @map("now_playing_subtitle")
+  nowPlayingArt       String?   @map("now_playing_art")
+  quotaNotifiedAt     DateTime? @map("quota_notified_at")
+
+  @@map("poll_state")
+}
