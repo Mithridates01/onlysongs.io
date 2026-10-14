@@ -4,6 +4,8 @@ A small web app that watches a Spotify account and, when a podcast episode is pl
 
 Spotify Premium is required. Each person brings their own Spotify developer app (Client ID and Client Secret). There is no shared Spotify app. Spotify's Development Mode caps each app at a handful of users, and playback control through the API requires Premium.
 
+The stack, the web and worker processes, and the runtime diagrams are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## What you need
 
 - Node.js 22 or newer, for local development
