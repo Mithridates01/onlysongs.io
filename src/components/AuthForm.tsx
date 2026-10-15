@@ -20,9 +20,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    const data = (await response.json()) as { error?: string; next?: string };
+    // A server error can arrive with an empty or HTML body; show a message instead of crashing.
+    const data = (await response.json().catch(() => ({}))) as { error?: string; next?: string };
     if (!response.ok || !data.next) {
-      setError(data.error ?? "Something went wrong.");
+      setError(data.error ?? (response.ok ? "Something went wrong." : "The server could not sign you in. Try again in a moment."));
       setPending(false);
       return;
     }
