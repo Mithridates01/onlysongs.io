@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LocalTime } from "@/components/LocalTime";
 import { prisma } from "@/lib/db";
 import { currentSession } from "@/lib/http";
 import { resultLabel } from "@/lib/outcomes";
@@ -55,7 +56,9 @@ export default async function ActivityPage({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <td>{row.at.toLocaleString()}</td>
+                  <td>
+                    <LocalTime iso={row.at.toISOString()} />
+                  </td>
                   <td>{row.showName ?? "—"}</td>
                   <td>{row.episodeName ?? "—"}</td>
                   <td>{row.deviceName ?? "—"}</td>

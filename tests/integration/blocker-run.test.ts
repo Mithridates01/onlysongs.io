@@ -282,8 +282,9 @@ describe("runUserCheck against Postgres and Redis", () => {
       expect(pauseMs).toBeLessThan(61 * 60 * 1000);
       expect(poll.consecutiveFailures).toBe(2);
       expect(poll.quotaNotifiedAt).not.toBeNull();
+      expect(poll.pauseReason).toBe("quota");
       const connection = await prisma.spotifyConnection.findUniqueOrThrow({ where: { userId: user.id } });
-      expect(connection.status).toBe("quota_paused");
+      expect(connection.status).toBe("connected");
       const activity = await prisma.activityLog.findFirstOrThrow({ where: { userId: user.id } });
       expect(activity.result).toBe("quota");
       expect(activity.httpStatus).toBe(429);

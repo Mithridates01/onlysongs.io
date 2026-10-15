@@ -2,12 +2,13 @@ import { FAILURE_WARN_AT } from "./blocker-logic";
 import { last4 } from "./crypto";
 import { prisma } from "./db";
 import { redirectUri } from "./env";
-import { readWorkerHeart } from "./jobs";
+import { readWorkerHeart } from "./redis";
 import { isQuietNow, parseQuietHours, startOfZonedDay } from "./quiet-hours";
 import { readAllowedShows } from "./shows";
-import type { ConnectionState, ReplacementView, StatusResponse } from "./types";
+import type { ActivityResult, ConnectionStatus } from "@prisma/client";
+import type { ConnectionState, ReplacementView, StatusResponse, StatusWarning } from "./types";
 
-const REPLACED = ["replaced", "replaced_via_next"];
+const REPLACED: ActivityResult[] = ["replaced", "replaced_via_next"];
 
 export async function buildStatus(userId: string): Promise<StatusResponse | null> {
   const user = await prisma.user.findUnique({
@@ -21,7 +22,8 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
   const spotify = user.spotify;
   const quiet = parseQuietHours(settings.quietHours);
   const quietHoursActive = isQuietNow(quiet, settings.timeZone);
-  const connection = connectionState(spotify?.status, Boolean(spotify?.refreshTokenEnc), Boolean(spotify));
+  const quotaPaused = poll.pauseReason === "quota" && Boolean(poll.pausedUntil && poll.pausedUntil > new Date());
+  const connection = connectionState(spotify?.status, Boolean(spotify?.refreshTokenEnc), Boolean(spotify), quotaPaused);
   const worker = await readWorkerHeart();
 
   const [blockedAllTime, blockedToday] = await Promise.all([
@@ -36,11 +38,7 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
   ]);
 
   const replacement: ReplacementView | null =
-    settings.replacementUri &&
-    settings.replacementLabel &&
-    (settings.replacementKind === "track" ||
-      settings.replacementKind === "playlist" ||
-      settings.replacementKind === "album")
+    settings.replacementUri && settings.replacementLabel && settings.replacementKind
       ? {
           uri: settings.replacementUri,
           label: settings.replacementLabel,
@@ -50,20 +48,16 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
       : null;
 
   const blockedNow = poll.nowPlayingKind === "episode" || poll.nowPlayingKind === "audiobook";
-  const warnings: string[] = [];
-  if (connection === "broken") warnings.push("Reconnect Spotify. The blocker is off until you do.");
+  const warnings: StatusWarning[] = [];
+  if (connection === "broken") warnings.push({ text: "Reconnect Spotify. The blocker is off until you do." });
   if (connection === "quota_paused") {
-    warnings.push(
-      poll.pausedUntil
-        ? `Spotify quota is exceeded. Checks resume ${poll.pausedUntil.toLocaleString()}.`
-        : "Spotify quota is exceeded. Checks are paused.",
-    );
+    warnings.push({ text: "Spotify quota is exceeded. Checks resume", resumesAt: poll.pausedUntil?.toISOString() });
   }
   if (poll.consecutiveFailures >= FAILURE_WARN_AT) {
-    warnings.push("The last 10 checks failed. Spotify may be unreachable from this server.");
+    warnings.push({ text: "The last 10 checks failed. Spotify may be unreachable from this server." });
   }
   if (!worker.online) {
-    warnings.push("The worker is not running, so automatic checks are paused. Check now still works.");
+    warnings.push({ text: "The worker is not running, so automatic checks are paused. Check now still works." });
   }
 
   return {
@@ -101,14 +95,13 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
 }
 
 function connectionState(
-  status: string | undefined,
+  status: ConnectionStatus | undefined,
   hasRefresh: boolean,
   hasRow: boolean,
+  quotaPaused: boolean,
 ): ConnectionState {
   if (!hasRow || !status || status === "disconnected") return "disconnected";
   if (status === "broken") return "broken";
-  if (status === "quota_paused") return "quota_paused";
-  if (status === "connected" && hasRefresh) return "connected";
-  if (hasRefresh) return "connected";
-  return "needs_connect";
+  if (!hasRefresh) return "needs_connect";
+  return quotaPaused ? "quota_paused" : "connected";
 }

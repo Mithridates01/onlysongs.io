@@ -6,20 +6,6 @@ import { resetEmail, sendEmail, verifyEmail } from "./mail";
 import { prisma } from "./db";
 import { startSession } from "./sessions";
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export function normalizeEmail(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const email = value.trim().toLowerCase();
-  if (!EMAIL.test(email) || email.length > 200) return null;
-  return email;
-}
-
-export function checkPassword(value: unknown): string | null {
-  if (typeof value !== "string" || value.length < 8 || value.length > 200) return null;
-  return value;
-}
-
 export async function createUser(email: string, password: string) {
   const passwordHash = await bcrypt.hash(password, 12);
   return prisma.user.create({

@@ -3,7 +3,8 @@ import { authorizedCall } from "../../src/lib/accounts";
 import { runUserCheck } from "../../src/lib/blocker-run";
 import { decryptString } from "../../src/lib/crypto";
 import { prisma } from "../../src/lib/db";
-import { getQueue, getRedis, reconcileSchedules, removeSchedule, schedulerId, withUserLock } from "../../src/lib/jobs";
+import { getQueue, reconcileSchedules, removeSchedule, schedulerId } from "../../src/lib/jobs";
+import { getRedis, withUserLock } from "../../src/lib/redis";
 import { deleteUser, jsonResponse, seedListener, spotifyRoute, stubFetch } from "./helpers";
 
 describe("locks and token refresh across processes", () => {

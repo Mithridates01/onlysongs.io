@@ -33,6 +33,8 @@ Spotify credentials belong to the user. The server stores the client secret and 
 
 A check is skipped when the blocker is off, the user is inside a quota pause, the cooldown has not elapsed, quiet hours are active, Spotify is disconnected or broken, or no replacement is saved. Otherwise the worker reads `GET /v1/me/player`. Music, silence, and a paused player are left alone. A podcast is replaced when podcast blocking is on. An audiobook is replaced when audiobook blocking is on. Both settings start on. A chapter that Spotify returns as an episode still counts as an audiobook when the item has an audiobook parent or the playback context is an audiobook. One allow list matches either a show id or an audiobook id. The replacement is `PUT /v1/me/player/play` with a track URI or a playlist or album context. A 403 or 404 falls back to `POST /v1/me/player/next`. A Redis lock, `lock:check:<userId>`, stops two checks for the same user from overlapping. It holds a random token for 12 seconds and is released only by its owner, with a compare-and-delete script. A check has 10 seconds from taking the lock for its player calls. A token refresh has its own 25-second timeout and is never cut short by the check, because Spotify can finish a refresh after the caller stops waiting and rotate the refresh token, and that new token would be lost.
 
+The check is split in two. `src/lib/check-plan.ts` is pure: `preflight` applies the gates that need no Spotify call, `decide` turns the player read into a plan, and `settleSwap` turns the play or skip-next result into what to record. `src/lib/blocker-run.ts` does the I/O around them: it reads the user, calls Spotify, and writes the result once (poll state, activity row, then the broken-connection and quota-email side effects). Request bodies are validated with the zod schemas in `src/lib/schemas.ts`.
+
 Token refresh is single-flight per user across web and worker. A refresh takes `lock:refresh:<userId>`, re-reads the connection, reuses an access token another process just stored, and otherwise refreshes with the newest refresh token. `authorizedCall` changes nothing but the stored tokens. When Spotify revokes access, the check marks the connection broken, turns the blocker off, and queues the email. Search and resolve only report the error.
 
 Accounts are independent. One user's 429 or revoked token does not stop the others. Ten consecutive failed checks surface a warning on the dashboard. The failure count resets when a check ends in music, idle, an allow-listed show, or a successful replacement.
@@ -44,10 +46,10 @@ Accounts are independent. One user's 429 or revoked token does not stop the othe
 | `users` | Email, password hash, admin flag, email verified time |
 | `sessions` | One row per sign-in: expiry, revoked time, last seen, user agent |
 | `auth_tokens` | SHA-256 of each emailed link token, its purpose (`verify_email`, `reset_password`), expiry, and used time |
-| `spotify_connections` | Encrypted client secret and tokens, OAuth state, connection status |
+| `spotify_connections` | Encrypted client secret and tokens, OAuth state, connection status (enum: pending, connected, broken, disconnected) |
 | `blocker_settings` | Enabled flag, interval, replacement, podcast and audiobook switches, quiet hours, allow list, time zone |
-| `poll_state` | Last check, cooldown, quota pause, failure count, now-playing snapshot |
-| `activity_log` | Swaps and skips. Newest first. Kept for 90 days. |
+| `poll_state` | Last check, cooldown, pause (`paused_until` and `pause_reason`: rate_limited or quota), failure count, now-playing snapshot |
+| `activity_log` | Swaps and skips, with enum `action` and `result`. Newest first. Kept for 90 days. |
 
 ### Request path
 

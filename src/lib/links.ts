@@ -12,3 +12,12 @@ export function openSpotifyDashboard(): boolean {
 export function spotifyDashboardAlreadyOpened(): boolean {
   return sessionStorage.getItem(OPENED_KEY) === "1";
 }
+
+// Starts Spotify sign-in with a POST, for buttons that sit inside another form.
+export function startSpotifyConnect(): void {
+  const form = document.createElement("form");
+  form.method = "post";
+  form.action = "/api/spotify/connect";
+  document.body.appendChild(form);
+  form.submit();
+}

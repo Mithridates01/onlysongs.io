@@ -26,7 +26,9 @@ docker compose -f docker-compose.dev.yml up -d
 
 | Path | Role |
 | --- | --- |
-| `tests/blocker-logic.test.ts` | Playback classification, play commands, token refresh |
+| `tests/blocker-logic.test.ts` | Playback classification, play commands, token refresh (`spotify-auth.ts`) |
+| `tests/check-plan.test.ts` | The pure check: `preflight`, `decide`, and `settleSwap` from inputs to the poll patch, activity row, and side effects |
+| `tests/schemas.test.ts` | Request body schemas: normalizing and the error messages users see |
 | `tests/spotify-http.test.ts` | Retry-After, quota body, token HTTP fixtures |
 | `tests/quiet-hours.test.ts` | Quiet-hour windows and zoned midnight |
 | `tests/spotify-uri.test.ts` | `spotify:` URIs and `open.spotify.com` links |
@@ -74,7 +76,7 @@ Spotify is stubbed by replacing `globalThis.fetch` for the length of each test. 
 - Quiet hours return `quiet_hours` and make no Spotify call. The failure count stays as it was.
 - A 401 refreshes once. The retry uses the new access token, and the stored refresh token is unchanged. A second 401 marks the connection broken and turns the blocker off. `invalid_grant` does the same and never reads the player.
 - Play responses 403 and 404 fall back to `POST /me/player/next`. A restricted device does not increment the failure count. A 500 after a successful player read does.
-- `QUOTA_EXCEEDED` sets that user's pause to about one hour, sets the connection to `quota_paused`, and logs `quota`.
+- `QUOTA_EXCEEDED` sets that user's pause to about one hour with `pause_reason` `quota`, leaves the connection `connected`, and logs `quota`.
 - Two overlapping checks for one user: the second returns `busy` while the Redis lock `lock:check:<userId>` is held.
 
 Route cases in `tests/integration/api.test.ts`:

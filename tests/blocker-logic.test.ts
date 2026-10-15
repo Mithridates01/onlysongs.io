@@ -2,18 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   COOLDOWN_MS,
   QUOTA_PAUSE_MS,
-  callWithAuthRetry,
   classifyHttpStatus,
   classifyPlayback,
-  ensureAccessToken,
   isAllowListed,
   playBodyFor,
   playOutcome,
   retryPauseMs,
-  tokenNeedsRefresh,
   type PlaybackResult,
   type PlayerBody,
 } from "../src/lib/blocker-logic";
+import { callWithAuthRetry, ensureAccessToken, tokenNeedsRefresh } from "../src/lib/spotify-auth";
 
 function playing(body: PlayerBody): PlaybackResult {
   return { ok: true, status: 200, body };

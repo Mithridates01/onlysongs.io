@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyTokenError } from "../src/lib/blocker-logic";
+import { classifyTokenError } from "../src/lib/spotify-auth";
 import { isQuotaExceeded, parseRetryAfter, refreshTokens } from "../src/lib/spotify";
 
 describe("spotify http fixtures", () => {

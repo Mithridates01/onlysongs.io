@@ -1,4 +1,8 @@
+// quota_paused is derived from poll_state.pause_reason, not stored as a status.
 export type ConnectionState = "disconnected" | "needs_connect" | "connected" | "broken" | "quota_paused";
+
+// resumesAt is ISO; the browser formats it in the viewer's time zone.
+export type StatusWarning = { text: string; resumesAt?: string };
 
 export type ReplacementView = {
   uri: string;
@@ -38,7 +42,7 @@ export type StatusResponse = {
   blockedAllTime: number;
   replacement: ReplacementView | null;
   worker: { online: boolean; heartbeatAt: string | null };
-  warnings: string[];
+  warnings: StatusWarning[];
   redirectUri: string;
   email: string;
   isAdmin: boolean;
