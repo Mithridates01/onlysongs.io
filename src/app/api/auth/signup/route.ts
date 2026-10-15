@@ -1,11 +1,11 @@
 import { Prisma } from "@prisma/client";
-import { checkPassword, createUser, normalizeEmail, sessionFor } from "@/lib/auth-actions";
+import { checkPassword, createUser, normalizeEmail, sendVerification, sessionFor } from "@/lib/auth-actions";
 import { json, requestIp } from "@/lib/http";
-import { rateLimit } from "@/lib/rate-limit";
+import { MINUTE, rateLimit } from "@/lib/rate-limit";
 import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 
 export async function POST(request: Request) {
-  const limit = rateLimit(`signup:${requestIp(request)}`, 5, 15 * 60 * 1000);
+  const limit = await rateLimit({ key: `signup:ip:${requestIp(request)}`, limit: 5, windowMs: 15 * MINUTE });
   if (!limit.ok) return json({ error: "Too many sign-up attempts. Wait a few minutes." }, 429);
 
   const body = await readBody(request);
@@ -17,7 +17,8 @@ export async function POST(request: Request) {
 
   try {
     const user = await createUser(email, password);
-    const token = await sessionFor(user);
+    await sendVerification(user);
+    const token = await sessionFor(user, request);
     const response = json({ ok: true, next: "/onboarding" });
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;

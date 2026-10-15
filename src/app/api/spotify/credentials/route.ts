@@ -2,13 +2,13 @@ import { encryptString, last4 } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 import { json, requestIp, requireUser } from "@/lib/http";
 import { tryUnschedule } from "@/lib/jobs";
-import { rateLimit } from "@/lib/rate-limit";
+import { MINUTE, rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const user = await requireUser();
   if (!user) return json({ error: "Sign in required." }, 401);
 
-  const limit = rateLimit(`creds:${requestIp(request)}:${user.id}`, 10, 15 * 60 * 1000);
+  const limit = await rateLimit({ key: `creds:${user.id}:${requestIp(request)}`, limit: 10, windowMs: 15 * MINUTE });
   if (!limit.ok) return json({ error: "Too many credential updates. Wait a few minutes." }, 429);
 
   let body: { clientId?: unknown; clientSecret?: unknown } | null = null;

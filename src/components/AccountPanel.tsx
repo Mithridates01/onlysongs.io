@@ -44,6 +44,21 @@ export function AccountPanel({ initial }: { initial: StatusResponse }) {
     window.location.href = "/onboarding";
   }
 
+  async function signOutOthers() {
+    setPending(true);
+    setError("");
+    setMessage("");
+    const response = await fetch("/api/auth/logout?scope=others", { method: "POST" });
+    const data = (await response.json()) as { ended?: number; error?: string };
+    setPending(false);
+    if (!response.ok) {
+      setError(data.error ?? "Could not sign out other devices.");
+      return;
+    }
+    const ended = data.ended ?? 0;
+    setMessage(ended ? `Signed out ${ended} other session${ended === 1 ? "" : "s"}.` : "No other devices were signed in.");
+  }
+
   async function deleteAccount(event: React.FormEvent) {
     event.preventDefault();
     if (confirm.trim().toLowerCase() !== initial.email) {
@@ -104,6 +119,13 @@ export function AccountPanel({ initial }: { initial: StatusResponse }) {
           </form>
         </section>
       </div>
+      <section className="card" style={{ marginTop: 16 }}>
+        <h2>Signed-in devices</h2>
+        <p className="help">Signs out every other browser and device. This one stays signed in.</p>
+        <button className="btn secondary" type="button" onClick={signOutOthers} disabled={pending}>
+          Sign out other devices
+        </button>
+      </section>
       <section className="card" style={{ marginTop: 16 }}>
         <h2>Delete everything</h2>
         <p className="help">This removes your account, tokens, settings, and activity from this server.</p>

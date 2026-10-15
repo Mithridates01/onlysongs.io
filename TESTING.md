@@ -30,10 +30,11 @@ docker compose -f docker-compose.dev.yml up -d
 | `tests/spotify-http.test.ts` | Retry-After, quota body, token HTTP fixtures |
 | `tests/quiet-hours.test.ts` | Quiet-hour windows and zoned midnight |
 | `tests/spotify-uri.test.ts` | `spotify:` URIs and `open.spotify.com` links |
-| `tests/crypto.test.ts` | AES-256-GCM round trip and a wrong key |
+| `tests/crypto.test.ts` | Versioned AES-256-GCM round trip, a wrong key, legacy values, the previous key during rotation, a session key separate from the data key |
 | `tests/db-url.test.ts` | Default Postgres pool size per process |
 | `tests/integration/blocker-run.test.ts` | `runUserCheck` against Postgres, Redis, and stubbed Spotify |
 | `tests/integration/api.test.ts` | Signup, login, status, and enabling the blocker |
+| `tests/integration/accounts.test.ts` | Logout and sign-out-others revoke sessions, email verification, password reset (signs out everywhere, single use, expiry), no account enumeration, login rate limits |
 | `tests/integration/concurrency.test.ts` | Lock ownership, single-flight token refresh, refresh timeout, queued email, schedule repair |
 | `tests/integration/global-setup.ts` | Creates `onlysongs_test` and applies migrations |
 | `scripts/smoke.sh` | Curl checks against a running image |
@@ -131,7 +132,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on pull requests and on pushes 
 
 | Job | When | Steps |
 | --- | --- | --- |
-| Unit and typecheck | Every pull request and push to `dev` or `main` | `npm ci`, `npm run typecheck`, `npm test` |
+| Unit and typecheck | Every pull request and push to `dev` or `main` | `npm ci`, `npm run typecheck`, `npm test`, `npm run build` |
 | Integration | Every pull request and push to `dev` or `main` | Postgres 16 and Redis 7 service containers, then `npm run test:integration` |
 | Image smoke | Push to `dev` or `main` | `docker compose -f docker-compose.ci.yml up -d --build --wait`, then `scripts/smoke.sh` |
 

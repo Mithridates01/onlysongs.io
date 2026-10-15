@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { prisma } from "./db";
 import { clientIp } from "./rate-limit";
-import { readSession, SESSION_COOKIE, type SessionPayload } from "./session";
+import { SESSION_COOKIE, type SessionPayload } from "./session";
+import { liveSession } from "./sessions";
 
 export function json(data: unknown, status = 200) {
   return NextResponse.json(data, {
@@ -13,7 +14,7 @@ export function json(data: unknown, status = 200) {
 
 export async function currentSession(): Promise<SessionPayload | null> {
   const jar = await cookies();
-  return readSession(jar.get(SESSION_COOKIE)?.value);
+  return liveSession(jar.get(SESSION_COOKIE)?.value);
 }
 
 export async function requireUser() {

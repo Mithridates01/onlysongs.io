@@ -12,7 +12,7 @@ The design doc covers the stack, the two processes, and the check path. Day-to-d
 | Web | Next.js 15 App Router, React 19 |
 | Data | PostgreSQL 16, Prisma 6 |
 | Jobs | BullMQ 5 on Redis 7 |
-| Auth | Email and password (bcrypt, cost 12). Session is an HttpOnly cookie signed with `jose` (HS256). |
+| Auth | Email and password (bcrypt, cost 12). The session is an HttpOnly cookie, a `jose` HS256 JWT that names a row in `sessions`; revoking the row ends the session. Email verification and password reset use single-use emailed links. Rate limits are Redis counters per account, per account and IP, and per IP. |
 | Secrets at rest | AES-256-GCM. The key is `ENCRYPTION_KEY`. |
 | Mail | Nodemailer when `SMTP_HOST` is set. Otherwise the notice is a log line. |
 | Hosting | Railway: web and worker services, Postgres, and Redis, defined in `.railway/railway.ts`. Railway terminates HTTPS. A self-hosted Compose stack with Caddy 2 and Let's Encrypt remains as an alternative. |
@@ -41,7 +41,9 @@ Accounts are independent. One user's 429 or revoked token does not stop the othe
 
 | Table | Role |
 | --- | --- |
-| `users` | Email, password hash, admin flag |
+| `users` | Email, password hash, admin flag, email verified time |
+| `sessions` | One row per sign-in: expiry, revoked time, last seen, user agent |
+| `auth_tokens` | SHA-256 of each emailed link token, its purpose (`verify_email`, `reset_password`), expiry, and used time |
 | `spotify_connections` | Encrypted client secret and tokens, OAuth state, connection status |
 | `blocker_settings` | Enabled flag, interval, replacement, podcast and audiobook switches, quiet hours, allow list, time zone |
 | `poll_state` | Last check, cooldown, quota pause, failure count, now-playing snapshot |

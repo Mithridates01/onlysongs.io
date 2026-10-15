@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { EndSessionsButton } from "@/components/EndSessionsButton";
 import { prisma } from "@/lib/db";
 import { currentSession } from "@/lib/http";
 import { readWorkerHeart } from "@/lib/jobs";
@@ -41,6 +42,7 @@ export default async function AdminPage() {
               <th>Failures</th>
               <th>Last check</th>
               <th>Blocked</th>
+              <th>Sessions</th>
             </tr>
           </thead>
           <tbody>
@@ -55,6 +57,9 @@ export default async function AdminPage() {
                 <td>{user.poll?.consecutiveFailures ?? 0}</td>
                 <td>{user.poll?.lastCheckedAt ? user.poll.lastCheckedAt.toLocaleString() : "—"}</td>
                 <td>{blocked.get(user.id) ?? 0}</td>
+                <td>
+                  <EndSessionsButton userId={user.id} />
+                </td>
               </tr>
             ))}
           </tbody>

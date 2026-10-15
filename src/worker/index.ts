@@ -11,6 +11,8 @@ async function main() {
   );
   const { runUserCheck } = await import("../lib/blocker-run");
   const { notifyUser } = await import("../lib/mail");
+  const { assertMailConfigured } = await import("../lib/env");
+  assertMailConfigured();
   const { log } = await import("../lib/log");
 
   await reconcileSchedules();

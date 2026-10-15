@@ -25,6 +25,11 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # Catches bundling errors (for example a Node-only import reaching the
+      # edge runtime) that typecheck and tests do not see.
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://build:build@localhost:5432/build
 
   integrate:
     name: Integration
