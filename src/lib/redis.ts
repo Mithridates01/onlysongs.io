@@ -19,13 +19,15 @@ export function redisConnection() {
 
 export function getRedis(): IORedis {
   const g = globalThis as RedisGlobal;
-  if (!g.__blockerRedis) {
+  // A client that was quit (or closed by an older build) is replaced, never reused.
+  if (!g.__blockerRedis || g.__blockerRedis.status === "end") {
     const client = new IORedis(redisUrl(), {
       maxRetriesPerRequest: 2,
       connectTimeout: 2000,
+      // Keep reconnecting through an outage of any length. Commands still fail
+      // fast (maxRetriesPerRequest) while it is down.
       retryStrategy(times) {
-        if (times > 8) return null;
-        return Math.min(times * 150, 1000);
+        return Math.min(times * 200, 5000);
       },
     });
     client.on("error", (error) => {
