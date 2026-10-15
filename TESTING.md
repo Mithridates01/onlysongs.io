@@ -127,13 +127,13 @@ The report also shows causes (stale refresh tokens presented, overlapping player
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on pull requests and on pushes to `main`.
+GitHub Actions (`.github/workflows/ci.yml`) runs on pull requests and on pushes to `dev` and `main`. Work merges into `dev`; `main` is what gets deployed.
 
 | Job | When | Steps |
 | --- | --- | --- |
-| Unit and typecheck | Every pull request and push to `main` | `npm ci`, `npm run typecheck`, `npm test` |
-| Integration | Every pull request and push to `main` | Postgres 16 and Redis 7 service containers, then `npm run test:integration` |
-| Image smoke | Push to `main` | `docker compose -f docker-compose.ci.yml up -d --build --wait`, then `scripts/smoke.sh` |
+| Unit and typecheck | Every pull request and push to `dev` or `main` | `npm ci`, `npm run typecheck`, `npm test` |
+| Integration | Every pull request and push to `dev` or `main` | Postgres 16 and Redis 7 service containers, then `npm run test:integration` |
+| Image smoke | Push to `dev` or `main` | `docker compose -f docker-compose.ci.yml up -d --build --wait`, then `scripts/smoke.sh` |
 
 The image job generates a one-run encryption key in the workflow and tears the stack down afterward. A pull request does not build the image.
 
