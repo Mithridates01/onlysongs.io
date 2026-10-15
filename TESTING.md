@@ -35,9 +35,9 @@ docker compose -f docker-compose.dev.yml up -d
 | `tests/crypto.test.ts` | Versioned AES-256-GCM round trip, a wrong key, legacy values, the previous key during rotation, a session key separate from the data key |
 | `tests/db-url.test.ts` | Default Postgres pool size per process |
 | `tests/integration/blocker-run.test.ts` | `runUserCheck` against Postgres, Redis, and stubbed Spotify |
-| `tests/integration/api.test.ts` | Signup, login, status, and enabling the blocker |
+| `tests/integration/api.test.ts` | Signup, login, status, enabling the blocker, and starting Spotify sign-in only with a POST |
 | `tests/integration/accounts.test.ts` | Logout and sign-out-others revoke sessions, email verification, password reset (signs out everywhere, single use, expiry), no account enumeration, login rate limits |
-| `tests/integration/concurrency.test.ts` | Lock ownership, single-flight token refresh, refresh timeout, queued email, schedule repair |
+| `tests/integration/concurrency.test.ts` | Lock ownership, single-flight token refresh, waiting on a slow refresh instead of resending its token, queued email, schedule repair |
 | `tests/integration/global-setup.ts` | Creates `onlysongs_test` and applies migrations |
 | `scripts/smoke.sh` | Curl checks against a running image |
 | `scripts/load/` | Load-test runner, fake Spotify, seed, and simulated web traffic |
@@ -65,7 +65,9 @@ The other unit files cover URI parsing, quiet hours (same-day end is exclusive, 
 
 These use the dev Postgres and Redis from `docker-compose.dev.yml`. Global setup creates the database `onlysongs_test` if it is missing, then runs `prisma migrate deploy`. Redis traffic goes to database 1 (`redis://127.0.0.1:6379/1`). The dev database `blocker` and the worker heartbeat on Redis database 0 are left alone. The suite refuses any other database name or Redis index.
 
-Spotify is stubbed by replacing `globalThis.fetch` for the length of each test. Token refresh and the player calls both go through that fetch. The throwaway encryption key lives in `tests/integration/env.ts`. Mail is off because `SMTP_HOST` is cleared, so quota and breakage notices are log lines.
+Spotify is stubbed by replacing `globalThis.fetch` for the length of each test. Token refresh and the player calls both go through that fetch. The throwaway encryption key lives in `tests/integration/env.ts`. Mail is off because `SMTP_HOST` is cleared. Quota and Reconnect notices are queued as `notify` jobs, which no worker sends during tests; `tests/integration/accounts.test.ts` mocks `sendEmail` to capture verification and reset links.
+
+The test database keeps whatever migrations it last saw. After switching to a branch with fewer migrations, drop `onlysongs_test` (global setup recreates it); otherwise Prisma writes strings into enum columns and most tests fail.
 
 `runUserCheck` cases:
 

@@ -13,13 +13,13 @@ The design doc covers the stack, the two processes, and the check path. Day-to-d
 | Data | PostgreSQL 16, Prisma 6 |
 | Jobs | BullMQ 5 on Redis 7 |
 | Auth | Email and password (bcrypt, cost 12). The session is an HttpOnly cookie, a `jose` HS256 JWT that names a row in `sessions`; revoking the row ends the session. Email verification and password reset use single-use emailed links. Rate limits are Redis counters per account, per account and IP, and per IP. |
-| Secrets at rest | AES-256-GCM. The key is `ENCRYPTION_KEY`. |
-| Mail | Nodemailer when `SMTP_HOST` is set. Otherwise the notice is a log line. |
-| Hosting | Railway: web and worker services, Postgres, and Redis, defined in `.railway/railway.ts`. Railway terminates HTTPS. A self-hosted Compose stack with Caddy 2 and Let's Encrypt remains as an alternative. |
+| Secrets at rest | AES-256-GCM with a data key derived from `ENCRYPTION_KEY` by HKDF; the session key is derived separately. Values are written as `v1.<key id>.<data>`. `ENCRYPTION_KEY_PREVIOUS` covers a key rotation, and `npm run reencrypt` rewrites values under the current key. |
+| Mail | Nodemailer. The web process sends verification and reset links; the worker sends Reconnect and quota notices from queued `notify` jobs. Required when `APP_URL` is `https://`; locally Mailpit catches everything; with no `SMTP_HOST` each email is a log line. |
+| Hosting | Railway (planned, not deployed yet): web and worker services, Postgres, and Redis, defined in `.railway/railway.ts`. Railway terminates HTTPS. A self-hosted Compose stack with Caddy 2 and Let's Encrypt remains as an alternative. |
 | Packaging | One multi-stage Docker image with production dependencies only, run as the `node` user. `PROCESS=web` or `PROCESS=worker` selects the entrypoint, and a command passed to the container runs instead. Migrations run once per deploy (Railway pre-deploy, or `RUN_MIGRATIONS=1` under Compose). The worker bundle is built with esbuild. |
-| Tests | Vitest unit and integration suites, plus a Docker smoke script on `main`. Details are in [TESTING.md](../TESTING.md). |
+| Tests | Vitest unit and integration suites, a `next build` on every pull request, a Docker smoke script on pushes to `dev` and `main`, and a load test against a fake Spotify. Details are in [TESTING.md](../TESTING.md). |
 
-Local development has no edge proxy. `docker-compose.dev.yml` starts Postgres and Redis only. The web app is `npm run dev` and the worker is `npm run worker` (`tsx` on the TypeScript sources).
+Local development has no edge proxy. `docker-compose.dev.yml` starts Postgres, Redis, and Mailpit. The web app is `npm run dev` and the worker is `npm run worker` (`tsx` on the TypeScript sources).
 
 ## High-level design
 
@@ -27,7 +27,7 @@ Two processes share one database and one Redis.
 
 The **web** process serves the pages and the JSON API. It owns signup, login, Spotify OAuth, settings, the dashboard, and the manual **Check now** action. Check now calls the same check function as the worker, in the web process, and ignores the 15-second cooldown.
 
-The **worker** process does not serve HTTP. On startup it reconciles BullMQ job schedulers with users who have the blocker enabled, and every 5 minutes it restores any scheduler that is missing or has the wrong interval. It writes a Redis heartbeat every 10 seconds, and deletes activity rows older than 90 days every 6 hours. A BullMQ worker consumes the `playback-checks` queue at concurrency 50. The same queue carries `notify` jobs, which send the Reconnect and quota emails outside any check. Unless `DATABASE_URL` sets `connection_limit`, the worker opens up to 20 Postgres connections and the web process up to 10. Each enabled user has one scheduler, `blocker-<userId>`, repeating every `intervalSeconds` (10–300, default 60).
+The **worker** process does not serve HTTP. On startup it reconciles BullMQ job schedulers with users who have the blocker enabled, and every 5 minutes it restores any scheduler that is missing or has the wrong interval. It writes a Redis heartbeat every 10 seconds, and deletes activity rows older than 90 days every 6 hours. Both processes keep reconnecting to Redis through an outage of any length. A BullMQ worker consumes the `playback-checks` queue at concurrency 50. The same queue carries `notify` jobs, which send the Reconnect and quota emails outside any check. Unless `DATABASE_URL` sets `connection_limit`, the worker opens up to 20 Postgres connections and the web process up to 10. Each enabled user has one scheduler, `blocker-<userId>`, repeating every `intervalSeconds` (10–300, default 60).
 
 Spotify credentials belong to the user. The server stores the client secret and the OAuth tokens encrypted. The browser receives only the last four characters of the client id. Scopes are `user-read-playback-state`, `user-modify-playback-state`, and `user-read-currently-playing`. The redirect URI is `${APP_URL}/callback/spotify`.
 
@@ -53,11 +53,11 @@ Accounts are independent. One user's 429 or revoked token does not stop the othe
 
 ### Request path
 
-Middleware allows `/`, `/login`, `/signup`, `/callback/*`, `/api/health`, and `/api/auth/*` without a session. Other API calls from a signed-out browser get 401. Other pages redirect to `/login`. The session cookie is `pb_session`, SameSite Lax, and Secure only when `APP_URL` is HTTPS.
+Middleware allows `/`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/verify-email`, `/callback/*`, `/api/health`, `/api/health/worker`, and `/api/auth/*` without a session. Other API calls from a signed-out browser get 401. Other pages redirect to `/login`. Middleware runs on the edge runtime and checks only the JWT signature; pages and API routes also confirm the session row is live. The session cookie is `pb_session`, SameSite Lax, and Secure only when `APP_URL` is HTTPS. SameSite Lax is the CSRF defence for the state-changing POSTs, including connecting Spotify.
 
 ## Runtime diagram
 
-Production. Playback devices are reached only through Spotify.
+Production on Railway, as planned (not deployed yet). Playback devices are reached only through Spotify.
 
 ```mermaid
 flowchart TB
