@@ -26,6 +26,11 @@ export default defineRailway(() => {
       ENCRYPTION_KEY: preserve(),
       APP_URL: preserve(),
       ADMIN_EMAIL: preserve(),
+      SMTP_HOST: preserve(),
+      SMTP_PORT: preserve(),
+      SMTP_USER: preserve(),
+      SMTP_PASS: preserve(),
+      SMTP_FROM: preserve(),
     },
   });
 
@@ -42,6 +47,13 @@ export default defineRailway(() => {
       // Must match web: both decrypt the same Spotify tokens.
       ENCRYPTION_KEY: web.env.ENCRYPTION_KEY,
       APP_URL: web.env.APP_URL,
+      // The worker sends the Reconnect and quota emails, and refuses to start
+      // on an https:// APP_URL without SMTP.
+      SMTP_HOST: web.env.SMTP_HOST,
+      SMTP_PORT: web.env.SMTP_PORT,
+      SMTP_USER: web.env.SMTP_USER,
+      SMTP_PASS: web.env.SMTP_PASS,
+      SMTP_FROM: web.env.SMTP_FROM,
     },
   });
 
