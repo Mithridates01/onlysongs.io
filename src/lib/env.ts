@@ -20,7 +20,9 @@ export function isHttpsApp(): boolean {
 // Lives here, not in mail.ts, so instrumentation.ts can import it without
 // pulling nodemailer into the edge bundle.
 export function assertMailConfigured(): void {
-  if (isHttpsApp() && !process.env.SMTP_HOST?.trim()) {
-    throw new Error("SMTP_HOST must be set when APP_URL is https://. Verification and password-reset emails need it.");
+  if (isHttpsApp() && !process.env.RESEND_API_KEY?.trim() && !process.env.SMTP_HOST?.trim()) {
+    throw new Error(
+      "Set RESEND_API_KEY (or SMTP_HOST) when APP_URL is https://. Verification and password-reset emails need it.",
+    );
   }
 }

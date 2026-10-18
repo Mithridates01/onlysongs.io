@@ -11,7 +11,7 @@ The stack, the web and worker processes, and the runtime diagrams are in [docs/A
 - Node.js 22 or newer, for local development
 - Docker, for Postgres, Redis, and Mailpit locally
 - A Spotify Premium account
-- For a public deploy: a Railway account (or a VM with Docker), a domain, and an SMTP provider
+- For a public deploy: a Railway account (or a VM with Docker), a domain, and a Resend account for email
 
 ## Run it locally
 
@@ -68,7 +68,11 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `SESSION_SECRET` | No | At least 32 characters. Signs session cookies instead of the key derived from `ENCRYPTION_KEY`. |
 | `ADMIN_EMAIL` | No | This address becomes the operator on sign-up or login. |
 | `APP_DOMAIN` | Self-hosted only | Hostname only, such as `onlysongs.io`. Caddy requests a certificate for it. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | With an `https://` `APP_URL` | Email verification, password reset, and Spotify notices. Web and worker refuse to start on an `https://` `APP_URL` without `SMTP_HOST`. Locally, point them at Mailpit (`127.0.0.1`, port `1025`) and read mail at `http://127.0.0.1:8025`. Without `SMTP_HOST`, each email is written to the log. |
+| `RESEND_API_KEY` | Production (or SMTP) | Sends email through [Resend](https://resend.com)'s HTTPS API, which works on Railway's Hobby plan where outbound SMTP is blocked. Takes priority over SMTP when set. |
+| `MAIL_FROM` | With Resend | Sender, such as `OnlySongs <hello@your.domain>`. Its domain must be verified in Resend (SPF and DKIM records). |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Local, or instead of Resend | SMTP. Locally, point it at Mailpit (`127.0.0.1`, port `1025`) and read mail at `http://127.0.0.1:8025`. |
+
+Email covers verification, password reset, and Spotify notices. Web and worker refuse to start on an `https://` `APP_URL` with neither `RESEND_API_KEY` nor `SMTP_HOST`. With neither set locally, each email is written to the log.
 
 The redirect URI is always `${APP_URL}/callback/spotify`. The container also reads `PROCESS` (`web` or `worker`) and `RUN_MIGRATIONS=1` (Compose only). The load test's `SPOTIFY_FAKE_URL` and `ONLYSONGS_LOAD_TEST` are described in [TESTING.md](TESTING.md).
 
@@ -122,10 +126,10 @@ Secrets are not in the config file. Set them once on the `web` service; the work
 railway variable set ENCRYPTION_KEY=<64 hex chars> --service web
 railway variable set APP_URL=https://<your domain> --service web
 railway variable set ADMIN_EMAIL=you@example.com --service web
-railway variable set SMTP_HOST=<host> SMTP_PORT=587 SMTP_USER=<user> SMTP_PASS=<password> SMTP_FROM="OnlySongs <no-reply@your.domain>" --service web
+railway variable set RESEND_API_KEY=<key from Resend> MAIL_FROM="OnlySongs <hello@your.domain>" --service web
 ```
 
-SMTP is required: with an `https://` `APP_URL`, web and worker refuse to start without `SMTP_HOST`.
+Mail is required: with an `https://` `APP_URL`, web and worker refuse to start without it. Railway's Hobby plan blocks outbound SMTP, so production uses Resend's HTTPS API. Verify the sending domain in Resend first.
 
 Generate the encryption key fresh for production and never change it, or stored Spotify secrets will not decrypt. Each user's Spotify app needs the redirect URI `https://<your domain>/callback/spotify`.
 
@@ -155,11 +159,8 @@ APP_DOMAIN=onlysongs.io
 APP_URL=https://onlysongs.io
 ENCRYPTION_KEY=paste-a-new-64-hex-char-key
 ADMIN_EMAIL=you@example.com
-SMTP_HOST=your-smtp-host
-SMTP_PORT=587
-SMTP_USER=...
-SMTP_PASS=...
-SMTP_FROM=OnlySongs <no-reply@onlysongs.io>
+RESEND_API_KEY=...
+MAIL_FROM=OnlySongs <hello@onlysongs.io>
 ```
 
 `APP_DOMAIN` is the hostname only. `APP_URL` is `https://` plus that hostname. Generate a new `ENCRYPTION_KEY` on the server. Do not reuse a laptop key if the laptop `.env` was ever copied around, and do not change the key later or stored Spotify secrets will not decrypt.
