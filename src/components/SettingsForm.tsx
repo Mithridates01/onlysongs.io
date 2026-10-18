@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AllowedShowView, SearchHitView, StatusResponse } from "@/lib/types";
 
 const ZONES = [
@@ -17,12 +17,15 @@ const ZONES = [
 ];
 
 export function SettingsForm({ initial }: { initial: StatusResponse }) {
-  const browserZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const zones = ZONES.includes(browserZone) ? ZONES : [browserZone, ...ZONES];
+  // The device's zone is only known in the browser, so it joins the list after
+  // mount; reading it during render made server and client HTML differ.
+  const [browserZone, setBrowserZone] = useState<string | null>(null);
+  useEffect(() => setBrowserZone(Intl.DateTimeFormat().resolvedOptions().timeZone), []);
+  const zones = [...new Set([...(browserZone ? [browserZone] : []), initial.timeZone, ...ZONES])];
   const [interval, setIntervalSeconds] = useState(initial.intervalSeconds);
   const [podcasts, setPodcasts] = useState(initial.blockPodcasts);
   const [audiobooks, setAudiobooks] = useState(initial.blockAudiobooks);
-  const [timeZone, setTimeZone] = useState(zones.includes(initial.timeZone) ? initial.timeZone : "UTC");
+  const [timeZone, setTimeZone] = useState(initial.timeZone);
   const [quietOn, setQuietOn] = useState(Boolean(initial.quietHours));
   const [start, setStart] = useState(initial.quietHours?.start ?? "06:00");
   const [end, setEnd] = useState(initial.quietHours?.end ?? "08:00");
@@ -95,6 +98,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
 
   return (
     <>
+      <p className="eyebrow">How it behaves</p>
       <h1 className="page-title">Settings</h1>
       <p className="lede">
         Spotify does not push playback changes, so some of a podcast will always play before the swap. At {interval} seconds,

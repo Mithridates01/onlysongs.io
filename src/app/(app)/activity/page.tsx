@@ -27,10 +27,13 @@ export default async function ActivityPage({
 
   return (
     <>
-      <div className="spread">
+      <div className="spread" style={{ alignItems: "flex-end", marginBottom: 28 }}>
         <div>
+          <p className="eyebrow">Last 90 days</p>
           <h1 className="page-title">Activity</h1>
-          <p className="lede">Swaps and skips from the last 90 days, newest first.</p>
+          <p className="lede" style={{ margin: 0 }}>
+            Each time OnlySongs stepped in, newest first.
+          </p>
         </div>
         <a className="btn secondary" href={csv}>
           Export CSV
@@ -38,39 +41,34 @@ export default async function ActivityPage({
       </div>
       {rows.length === 0 ? (
         <section className="card">
-          <p>No swaps yet. Music that plays normally is not listed.</p>
+          <p>Nothing yet. Music that plays normally isn’t listed here.</p>
         </section>
       ) : (
-        <section className="card table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Show</th>
-                <th>Episode</th>
-                <th>Device</th>
-                <th>Action</th>
-                <th>Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <LocalTime iso={row.at.toISOString()} />
-                  </td>
-                  <td>{row.showName ?? "—"}</td>
-                  <td>{row.episodeName ?? "—"}</td>
-                  <td>{row.deviceName ?? "—"}</td>
-                  <td>{row.action}</td>
-                  <td>
-                    {resultLabel(row.result)}
-                    {row.httpStatus ? <span className="muted"> · {row.httpStatus}</span> : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <section className="card" style={{ gap: 0, padding: "8px 24px" }}>
+          {rows.map((row, index) => {
+            const swapped = row.result === "replaced" || row.result === "replaced_via_next";
+            const kept = row.result === "allow_listed";
+            return (
+              <div key={row.id} className="list-row" style={index === 0 ? { borderTop: 0 } : undefined}>
+                <span className="mono" style={{ width: 150, flex: "none", color: "var(--muted)" }}>
+                  <LocalTime iso={row.at.toISOString()} />
+                </span>
+                <div className="row" style={{ flex: "1 1 320px", minWidth: 0, flexWrap: "nowrap", gap: 14 }}>
+                  <span className={kept ? "dot" : "dot apricot"} aria-hidden="true" />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15, lineHeight: 1.4 }}>{row.episodeName ?? (row.action === "error" ? "Spotify paused checks" : "—")}</div>
+                    <div className="help" style={{ fontSize: 13 }}>
+                      {[row.showName, row.deviceName].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                </div>
+                <span className={swapped ? "pill good" : "pill"} style={{ flex: "none" }}>
+                  {swapped ? (row.result === "replaced" ? "Back to your song" : "Skipped ahead") : resultLabel(row.result)}
+                  {row.httpStatus && !swapped ? <span className="muted"> · {row.httpStatus}</span> : null}
+                </span>
+              </div>
+            );
+          })}
         </section>
       )}
       {nextBefore ? (

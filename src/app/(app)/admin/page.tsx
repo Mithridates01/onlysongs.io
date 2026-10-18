@@ -28,7 +28,8 @@ export default async function AdminPage() {
 
   return (
     <>
-      <h1 className="page-title">Operator</h1>
+      <p className="eyebrow">Operator</p>
+      <h1 className="page-title">Admin</h1>
       <p className="lede">
         Worker {worker.online ? "is checking in" : "has no recent heartbeat"}. {enabled} blocker
         {enabled === 1 ? "" : "s"} enabled of {users.length} accounts.
