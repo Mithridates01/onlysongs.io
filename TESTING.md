@@ -34,6 +34,7 @@ docker compose -f docker-compose.dev.yml up -d
 | `tests/spotify-uri.test.ts` | `spotify:` URIs and `open.spotify.com` links |
 | `tests/crypto.test.ts` | Versioned AES-256-GCM round trip, a wrong key, legacy values, the previous key during rotation, a session key separate from the data key |
 | `tests/db-url.test.ts` | Default Postgres pool size per process |
+| `tests/mail.test.ts` | Sending through Resend's API, its error reasons, and when mail is required |
 | `tests/integration/blocker-run.test.ts` | `runUserCheck` against Postgres, Redis, and stubbed Spotify |
 | `tests/integration/api.test.ts` | Signup, login, status, enabling the blocker, and starting Spotify sign-in only with a POST |
 | `tests/integration/accounts.test.ts` | Logout and sign-out-others revoke sessions, email verification, password reset (signs out everywhere, single use, expiry), no account enumeration, login rate limits |
