@@ -1,21 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { Brand } from "./Brand";
 import { useState } from "react";
 
 function Frame({ title, lede, children }: { title: string; lede: string; children: React.ReactNode }) {
   return (
     <main className="app">
-      <Link href="/" className="brand">
-        <small>onlysongs.io</small>
-        <strong>OnlySongs</strong>
-      </Link>
-      <h1 className="page-title" style={{ marginTop: 28 }}>
-        {title}
-      </h1>
-      <p className="lede">{lede}</p>
-      <div className="card" style={{ maxWidth: 460 }}>
-        {children}
+      <header className="topbar">
+        <Brand />
+      </header>
+      <div style={{ maxWidth: 460, margin: "clamp(8px, 4vw, 48px) auto 0", display: "flex", flexDirection: "column", gap: 8 }}>
+        <h1 className="page-title" style={{ fontSize: 40, fontWeight: 300 }}>
+          {title}
+        </h1>
+        <p className="lede">{lede}</p>
+        <div className="card">{children}</div>
       </div>
     </main>
   );

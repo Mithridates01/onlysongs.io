@@ -40,6 +40,8 @@ export type StatusResponse = {
   };
   blockedToday: number;
   blockedAllTime: number;
+  // The last three swaps, newest first, for the dashboard.
+  recent: { at: string; showName: string | null; episodeName: string | null }[];
   replacement: ReplacementView | null;
   worker: { online: boolean; heartbeatAt: string | null };
   warnings: StatusWarning[];
