@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { EarlyAccessRequests } from "@/components/EarlyAccessRequests";
 import { EndSessionsButton } from "@/components/EndSessionsButton";
 import { LocalTime } from "@/components/LocalTime";
 import { prisma } from "@/lib/db";
@@ -11,7 +12,7 @@ export default async function AdminPage() {
   const me = await prisma.user.findUnique({ where: { id: session.sub } });
   if (!me?.isAdmin) notFound();
 
-  const [users, counts, worker] = await Promise.all([
+  const [users, counts, worker, requests] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       include: { spotify: true, settings: true, poll: true },
@@ -22,18 +23,32 @@ export default async function AdminPage() {
       _count: { _all: true },
     }),
     readWorkerHeart(),
+    prisma.earlyAccessRequest.findMany({ orderBy: { createdAt: "desc" }, take: 200 }),
   ]);
+  // Waiting requests first, then invites, then everything settled.
+  const rank = { pending: 0, invited: 1, declined: 2, joined: 3 } as const;
+  const requestRows = requests
+    .sort((a, b) => rank[a.status] - rank[b.status] || b.createdAt.getTime() - a.createdAt.getTime())
+    .map((row) => ({
+      id: row.id,
+      email: row.email,
+      status: row.status,
+      createdAt: row.createdAt.toISOString(),
+      inviteExpiresAt: row.inviteExpiresAt?.toISOString() ?? null,
+    }));
   const blocked = new Map(counts.map((row) => [row.userId, row._count._all]));
   const enabled = users.filter((user) => user.settings?.enabled).length;
 
   return (
     <>
-      <h1 className="page-title">Operator</h1>
+      <p className="eyebrow">Operator</p>
+      <h1 className="page-title">Admin</h1>
       <p className="lede">
         Worker {worker.online ? "is checking in" : "has no recent heartbeat"}. {enabled} blocker
         {enabled === 1 ? "" : "s"} enabled of {users.length} accounts.
       </p>
-      <section className="card table-wrap">
+      <EarlyAccessRequests initial={requestRows} />
+      <section className="card table-wrap" style={{ marginTop: 20 }}>
         <table>
           <thead>
             <tr>

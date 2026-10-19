@@ -77,9 +77,10 @@ export function AccountPanel({ initial }: { initial: StatusResponse }) {
 
   return (
     <>
+      <p className="eyebrow">{initial.email}</p>
       <h1 className="page-title">Account</h1>
-      <p className="lede">Secrets stay on the server. This page shows only the last four characters of the Client ID.</p>
-      {error ? <p className="error">{error}</p> : null}
+      <p className="lede">Your Spotify secrets are encrypted. Only the last four characters of the Client ID are ever shown.</p>
+      {error ? <p className="banner bad">{error}</p> : null}
       {message ? <p className="banner good">{message}</p> : null}
       <div className="grid two">
         <section className="card">

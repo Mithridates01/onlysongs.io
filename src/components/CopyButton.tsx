@@ -8,7 +8,7 @@ export function CopyButton({ value }: { value: string }) {
   return (
     <button
       type="button"
-      className="btn ghost"
+      className="btn ghost sm"
       onClick={async () => {
         await navigator.clipboard.writeText(value);
         setDone(true);

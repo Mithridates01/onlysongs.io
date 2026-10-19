@@ -6,13 +6,14 @@ import { resetEmail, sendEmail, verifyEmail } from "./mail";
 import { prisma } from "./db";
 import { startSession } from "./sessions";
 
-export async function createUser(email: string, password: string) {
+export async function createUser(email: string, password: string, opts?: { verified?: boolean }) {
   const passwordHash = await bcrypt.hash(password, 12);
   return prisma.user.create({
     data: {
       email,
       passwordHash,
       isAdmin: adminEmail() === email,
+      emailVerifiedAt: opts?.verified ? new Date() : null,
       settings: { create: {} },
       poll: { create: {} },
     },

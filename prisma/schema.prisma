@@ -162,3 +162,26 @@ enum ActivityResult {
   quota
   broken
 }
+
+enum EarlyAccessStatus {
+  pending
+  invited
+  declined
+  joined
+}
+
+// The early-access list. Approving issues a single-use invite; only its
+// SHA-256 is stored, and a new invite replaces the old one.
+model EarlyAccessRequest {
+  id              String            @id @default(cuid())
+  email           String            @unique
+  status          EarlyAccessStatus @default(pending)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  decidedAt       DateTime?         @map("decided_at")
+  inviteTokenHash String?           @unique @map("invite_token_hash")
+  inviteExpiresAt DateTime?         @map("invite_expires_at")
+  joinedAt        DateTime?         @map("joined_at")
+
+  @@index([status, createdAt])
+  @@map("early_access_requests")
+}
