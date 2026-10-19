@@ -81,6 +81,10 @@ The redirect URI is always `${APP_URL}/callback/spotify`. The container also rea
 
 Sign-up is invite-only by default (`SIGNUPS=invite`). Visitors leave an email on the landing page. On the Admin page the operator approves or declines each request. Approving emails a single-use link, valid for 14 days, to `/join`, where the person sets a password; the account starts with its email confirmed. Resend issues a fresh link and voids the old one. The `ADMIN_EMAIL` address can always sign up directly.
 
+## Admin
+
+The `ADMIN_EMAIL` account sees an Admin page with three totals (accounts, active today, waiting for approval), an accounts-over-time chart and a daily-active-users chart over 7, 30 or 90 UTC days, the early-access requests, and the users table. A user counts as active once per day when they sign in or use the site; background checks don't count.
+
 ## What a check does
 
 Every interval (10–300 seconds, default 60):

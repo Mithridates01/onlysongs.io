@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { AdminCharts } from "@/components/AdminCharts";
 import { EarlyAccessRequests } from "@/components/EarlyAccessRequests";
+import { loadSeries } from "@/lib/admin-stats";
 import { EndSessionsButton } from "@/components/EndSessionsButton";
 import { LocalTime } from "@/components/LocalTime";
 import { prisma } from "@/lib/db";
@@ -12,7 +14,7 @@ export default async function AdminPage() {
   const me = await prisma.user.findUnique({ where: { id: session.sub } });
   if (!me?.isAdmin) notFound();
 
-  const [users, counts, worker, requests] = await Promise.all([
+  const [users, counts, worker, requests, series] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       include: { spotify: true, settings: true, poll: true },
@@ -24,6 +26,7 @@ export default async function AdminPage() {
     }),
     readWorkerHeart(),
     prisma.earlyAccessRequest.findMany({ orderBy: { createdAt: "desc" }, take: 200 }),
+    loadSeries(90),
   ]);
   // Waiting requests first, then invites, then everything settled.
   const rank = { pending: 0, invited: 1, declined: 2, joined: 3 } as const;
@@ -47,7 +50,10 @@ export default async function AdminPage() {
         Worker {worker.online ? "is checking in" : "has no recent heartbeat"}. {enabled} blocker
         {enabled === 1 ? "" : "s"} enabled of {users.length} accounts.
       </p>
-      <EarlyAccessRequests initial={requestRows} />
+      <AdminCharts series={series} pending={requestRows.filter((row) => row.status === "pending").length} />
+      <div style={{ marginTop: 20 }}>
+        <EarlyAccessRequests initial={requestRows} />
+      </div>
       <section className="card table-wrap" style={{ marginTop: 20 }}>
         <table>
           <thead>
