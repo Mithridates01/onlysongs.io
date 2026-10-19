@@ -66,7 +66,8 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `ENCRYPTION_KEY` | Yes | 32 bytes as 64 hex characters. The root key: HKDF derives separate keys from it for Spotify secrets at rest and for session cookies. |
 | `ENCRYPTION_KEY_PREVIOUS` | Rotation only | The old root key while rotating. Values under it still decrypt; `npm run reencrypt -- --apply` rewrites them under the new key. Rotating also signs everyone out. |
 | `SESSION_SECRET` | No | At least 32 characters. Signs session cookies instead of the key derived from `ENCRYPTION_KEY`. |
-| `ADMIN_EMAIL` | No | This address becomes the operator on sign-up or login. |
+| `ADMIN_EMAIL` | No | This address becomes the operator on sign-up or login, and can always sign up. |
+| `SIGNUPS` | No | `invite` (default): sign-up only through an approved early-access invite. `open`: anyone can create an account. |
 | `APP_DOMAIN` | Self-hosted only | Hostname only, such as `onlysongs.io`. Caddy requests a certificate for it. |
 | `RESEND_API_KEY` | Production (or SMTP) | Sends email through [Resend](https://resend.com)'s HTTPS API, which works on Railway's Hobby plan where outbound SMTP is blocked. Takes priority over SMTP when set. |
 | `MAIL_FROM` | With Resend | Sender, such as `OnlySongs <hello@your.domain>`. Its domain must be verified in Resend (SPF and DKIM records). |
@@ -75,6 +76,10 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 Email covers verification, password reset, and Spotify notices. Web and worker refuse to start on an `https://` `APP_URL` with neither `RESEND_API_KEY` nor `SMTP_HOST`. With neither set locally, each email is written to the log.
 
 The redirect URI is always `${APP_URL}/callback/spotify`. The container also reads `PROCESS` (`web` or `worker`) and `RUN_MIGRATIONS=1` (Compose only). The load test's `SPOTIFY_FAKE_URL` and `ONLYSONGS_LOAD_TEST` are described in [TESTING.md](TESTING.md).
+
+## Early access
+
+Sign-up is invite-only by default (`SIGNUPS=invite`). Visitors leave an email on the landing page. On the Admin page the operator approves or declines each request. Approving emails a single-use link, valid for 14 days, to `/join`, where the person sets a password; the account starts with its email confirmed. Resend issues a fresh link and voids the old one. The `ADMIN_EMAIL` address can always sign up directly.
 
 ## What a check does
 

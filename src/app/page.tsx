@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { EarlyAccessForm } from "@/components/AccountFlows";
 import { Brand } from "@/components/Brand";
+import { signupsOpen } from "@/lib/early-access";
 import { currentSession } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,9 @@ const icon = { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", stroke
 export default async function HomePage() {
   const session = await currentSession();
   if (session) redirect("/dashboard");
+  // Invite-only (the default): every call to action leads to the early-access form.
+  const open = signupsOpen();
+  const cta = open ? { href: "/signup", label: "Create an account" } : { href: "#early", label: "Get early access" };
 
   return (
     <main className="app landing">
@@ -22,11 +27,16 @@ export default async function HomePage() {
           <a className="navlink" href="#setup">
             Setup
           </a>
+          {open ? null : (
+            <a className="navlink" href="#early">
+              Early access
+            </a>
+          )}
           <Link className="navlink" href="/login" style={{ color: "var(--text)" }}>
             Sign in
           </Link>
-          <Link className="btn sm" href="/signup">
-            Create account
+          <Link className="btn sm" href={cta.href}>
+            {open ? "Create account" : "Get early access"}
           </Link>
         </nav>
       </header>
@@ -46,8 +56,8 @@ export default async function HomePage() {
             song you chose back in.
           </p>
           <div className="home-actions">
-            <Link className="btn" href="/signup" style={{ minHeight: 52 }}>
-              Create an account
+            <Link className="btn" href={cta.href} style={{ minHeight: 52 }}>
+              {cta.label}
             </Link>
             <a className="btn secondary" href="#how" style={{ minHeight: 52 }}>
               See how it works
@@ -189,14 +199,50 @@ export default async function HomePage() {
           </ul>
         </div>
         <div style={{ flex: "1 1 260px", minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
-          <Link className="btn" href="/signup" style={{ minHeight: 52 }}>
-            Create an account
+          <Link className="btn" href={cta.href} style={{ minHeight: 52 }}>
+            {open ? "Create an account" : "Request early access"}
           </Link>
           <span className="help" style={{ fontSize: 13 }}>
             Your Spotify keys are encrypted and never shown again.
           </span>
         </div>
       </section>
+
+      {open ? null : (
+        <section
+          id="early"
+          aria-labelledby="early-h"
+          style={{
+            marginBottom: "clamp(72px, 9vw, 120px)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+            gap: 18,
+            padding: "clamp(40px, 6vw, 72px) clamp(20px, 4vw, 48px)",
+            borderRadius: 32,
+            border: "1px solid #242835",
+            background: "radial-gradient(600px 260px at 50% 0%, rgba(180,168,245,.14), transparent 70%), var(--deep)",
+          }}
+        >
+          <p className="eyebrow" style={{ margin: 0 }}>
+            Early access
+          </p>
+          <h2
+            id="early-h"
+            style={{ margin: 0, maxWidth: 640, fontFamily: "var(--display)", fontWeight: 300, fontSize: "clamp(30px, 3.8vw, 44px)", lineHeight: 1.12, letterSpacing: "-0.035em", textWrap: "balance" }}
+          >
+            Be one of the first to stay in the music.
+          </h2>
+          <p className="lede" style={{ margin: 0, maxWidth: 520 }}>
+            We’re letting people in a few at a time while we make setup as smooth as it can be. Leave your email and we’ll send your invite.
+          </p>
+          <EarlyAccessForm />
+          <p className="help" style={{ margin: "6px 0 0" }}>
+            Already have an account? <Link href="/login">Sign in</Link>
+          </p>
+        </section>
+      )}
 
       <footer className="spread" style={{ padding: "28px 0 44px", borderTop: "1px solid var(--raised)", fontSize: 13, color: "var(--muted)" }}>
         <span>OnlySongs isn’t affiliated with or endorsed by Spotify.</span>

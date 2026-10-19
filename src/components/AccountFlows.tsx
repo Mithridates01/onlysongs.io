@@ -175,3 +175,126 @@ export function VerifyBanner() {
     </p>
   );
 }
+
+export function JoinForm({ email, token }: { email: string; token: string }) {
+  const [password, setPassword] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setPending(true);
+    setError("");
+    const response = await fetch("/api/auth/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { error?: string; next?: string };
+    if (!response.ok || !data.next) {
+      setError(data.error ?? "Could not create the account.");
+      setPending(false);
+      return;
+    }
+    window.location.href = data.next;
+  }
+
+  return (
+    <Frame title="Finish creating your account" lede="Your early access request was approved. Choose a password, then we’ll help you connect Spotify.">
+      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label className="field">
+          <span>Email</span>
+          <input value={email} readOnly />
+        </label>
+        <label className="field">
+          <span>Password</span>
+          <input
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+            placeholder="At least 8 characters"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+        </label>
+        {error ? <p className="banner bad">{error}</p> : null}
+        <button className="btn" type="submit" disabled={pending}>
+          {pending ? "Creating…" : "Create account"}
+        </button>
+        <p className="help">
+          This link works once and expires 14 days after it was sent. Already finished? <Link href="/login">Sign in</Link>
+        </p>
+      </form>
+    </Frame>
+  );
+}
+
+export function InviteInvalid() {
+  return (
+    <Frame title="This invite link no longer works" lede="Invite links work once and last 14 days. If you already finished, sign in. Otherwise, ask for a new one.">
+      <div className="row">
+        <Link className="btn" href="/#early">
+          Request access again
+        </Link>
+        <Link className="btn secondary" href="/login">
+          Sign in
+        </Link>
+      </div>
+    </Frame>
+  );
+}
+
+export function EarlyAccessForm() {
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<"idle" | "pending" | "done">("idle");
+  const [error, setError] = useState("");
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setState("pending");
+    setError("");
+    const result = await post("/api/early-access", { email });
+    if (!result.ok) {
+      setError(result.error ?? "Could not save your request.");
+      setState("idle");
+      return;
+    }
+    setState("done");
+  }
+
+  if (state === "done") {
+    return (
+      <p role="status" className="banner good" style={{ margin: "8px 0 0" }}>
+        You’re on the early access list. Watch your inbox for an invite.
+      </p>
+    );
+  }
+  return (
+    <form onSubmit={submit} style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <label htmlFor="ea-email" className="visually-hidden">
+          Email address
+        </label>
+        <input
+          id="ea-email"
+          className="inline-input"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          required
+          style={{ flex: "1 1 240px", minWidth: 0, borderRadius: 999, minHeight: 52, padding: "0 20px" }}
+        />
+        <button className="btn" type="submit" disabled={state === "pending"} style={{ minHeight: 52 }}>
+          {state === "pending" ? "Sending…" : "Request access"}
+        </button>
+      </div>
+      {error ? <p className="error">{error}</p> : null}
+      <p className="help" style={{ margin: 0, fontSize: 13 }}>
+        Only your invite, and nothing else. You’ll need Spotify Premium to use it.
+      </p>
+    </form>
+  );
+}

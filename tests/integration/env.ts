@@ -13,6 +13,7 @@ export function applyTestEnv(): void {
   process.env.APP_URL = TEST_APP_URL;
   process.env.ADMIN_EMAIL = "";
   process.env.SMTP_HOST = "";
+  process.env.SIGNUPS = "open";
 }
 
 export function assertTestEnv(): void {

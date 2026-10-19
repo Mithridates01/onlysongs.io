@@ -76,6 +76,13 @@ export function verifyEmail(link: string): Email {
   };
 }
 
+export function inviteEmail(link: string): Email {
+  return {
+    subject: "You’re in: finish creating your OnlySongs account",
+    text: `Your early access request for OnlySongs was approved.\n\nChoose a password to finish creating your account:\n\n${link}\n\nThe link works once and expires in 14 days. Then we’ll walk you through connecting Spotify.`,
+  };
+}
+
 export function resetEmail(link: string): Email {
   return {
     subject: "Reset your password — OnlySongs",

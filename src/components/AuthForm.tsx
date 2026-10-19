@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Brand } from "./Brand";
 import { useState } from "react";
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({ mode, inviteOnly = false }: { mode: "login" | "signup"; inviteOnly?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -40,6 +40,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           {signup ? "Create your account" : "Welcome back"}
         </h1>
         <p className="lede">{signup ? "Then we’ll help you connect a Spotify app that belongs to you." : "Sign in to OnlySongs."}</p>
+        {signup && inviteOnly ? (
+          <p className="banner">
+            OnlySongs is invite-only for now. If you have an invite, use the link in your email.{" "}
+            <Link href="/#early">Request early access</Link>
+          </p>
+        ) : null}
         <form onSubmit={submit} className="card" style={{ gap: 4 }}>
           <label className="field">
             <span>Email</span>
@@ -67,7 +73,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               </>
             ) : (
               <>
-                New here? <Link href="/signup">Create an account</Link> · <Link href="/forgot-password">Forgot password?</Link>
+                New here?{" "}
+              {inviteOnly ? <Link href="/#early">Request early access</Link> : <Link href="/signup">Create an account</Link>} ·{" "}
+              <Link href="/forgot-password">Forgot password?</Link>
               </>
             )}
           </p>
