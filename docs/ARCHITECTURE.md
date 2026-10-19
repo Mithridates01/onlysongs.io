@@ -10,6 +10,7 @@ The design doc covers the stack, the two processes, and the check path. Day-to-d
 | --- | --- |
 | Runtime | Node.js 22, TypeScript |
 | Web | Next.js 15 App Router, React 19 |
+| UI | One dark "calm" theme in `src/app/globals.css` (CSS variables, no framework). Sora, Geist and Geist Mono are self-hosted with `next/font`. The breathing orb (`.orb`) is the status motif and stops for reduced motion. |
 | Data | PostgreSQL 16, Prisma 6 |
 | Jobs | BullMQ 5 on Redis 7 |
 | Auth | Email and password (bcrypt, cost 12). The session is an HttpOnly cookie, a `jose` HS256 JWT that names a row in `sessions`; revoking the row ends the session. Email verification and password reset use single-use emailed links. Rate limits are Redis counters per account, per account and IP, and per IP. |
@@ -27,7 +28,7 @@ Two processes share one database and one Redis.
 
 The **web** process serves the pages and the JSON API. It owns signup, login, Spotify OAuth, settings, the dashboard, and the manual **Check now** action. Check now calls the same check function as the worker, in the web process, and ignores the 15-second cooldown.
 
-The **worker** process does not serve HTTP. On startup it reconciles BullMQ job schedulers with users who have the blocker enabled, and every 5 minutes it restores any scheduler that is missing or has the wrong interval. It writes a Redis heartbeat every 10 seconds, and deletes activity rows older than 90 days every 6 hours. Both processes keep reconnecting to Redis through an outage of any length. A BullMQ worker consumes the `playback-checks` queue at concurrency 50. The same queue carries `notify` jobs, which send the Reconnect and quota emails outside any check. Unless `DATABASE_URL` sets `connection_limit`, the worker opens up to 20 Postgres connections and the web process up to 10. Each enabled user has one scheduler, `blocker-<userId>`, repeating every `intervalSeconds` (10–300, default 60).
+The **worker** process does not serve HTTP. On startup it reconciles BullMQ job schedulers with users who have the blocker enabled, and every 5 minutes it restores any scheduler that is missing or has the wrong interval. It writes a Redis heartbeat every 10 seconds, and every 6 hours deletes activity older than 90 days, sessions and email links that ended over a week ago, and active-day rows older than about 13 months. Both processes keep reconnecting to Redis through an outage of any length. A BullMQ worker consumes the `playback-checks` queue at concurrency 50. The same queue carries `notify` jobs, which send the Reconnect and quota emails outside any check. Unless `DATABASE_URL` sets `connection_limit`, the worker opens up to 20 Postgres connections and the web process up to 10. Each enabled user has one scheduler, `blocker-<userId>`, repeating every `intervalSeconds` (10–300, default 60).
 
 Spotify credentials belong to the user. The server stores the client secret and the OAuth tokens encrypted. The browser receives only the last four characters of the client id. Scopes are `user-read-playback-state`, `user-modify-playback-state`, and `user-read-currently-playing`. The redirect URI is `${APP_URL}/callback/spotify`.
 
@@ -45,6 +46,8 @@ Accounts are independent. One user's 429 or revoked token does not stop the othe
 | --- | --- |
 | `users` | Email, password hash, admin flag, email verified time |
 | `sessions` | One row per sign-in: expiry, revoked time, last seen, user agent |
+| `user_activity_days` | One row per user per UTC day they signed in or used the site; drives the operator's daily-active-users chart. Background checks never write here. Kept about 13 months. |
+| `early_access_requests` | Early-access list: email, status (pending, invited, declined, joined), the SHA-256 of the current 14-day invite, and when the person joined |
 | `auth_tokens` | SHA-256 of each emailed link token, its purpose (`verify_email`, `reset_password`), expiry, and used time |
 | `spotify_connections` | Encrypted client secret and tokens, OAuth state, connection status (enum: pending, connected, broken, disconnected) |
 | `blocker_settings` | Enabled flag, interval, replacement, podcast and audiobook switches, quiet hours, allow list, time zone |
@@ -53,7 +56,7 @@ Accounts are independent. One user's 429 or revoked token does not stop the othe
 
 ### Request path
 
-Middleware allows `/`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/verify-email`, `/callback/*`, `/api/health`, `/api/health/worker`, and `/api/auth/*` without a session. Other API calls from a signed-out browser get 401. Other pages redirect to `/login`. Middleware runs on the edge runtime and checks only the JWT signature; pages and API routes also confirm the session row is live. The session cookie is `pb_session`, SameSite Lax, and Secure only when `APP_URL` is HTTPS. SameSite Lax is the CSRF defence for the state-changing POSTs, including connecting Spotify.
+Middleware allows `/`, `/login`, `/signup`, `/join`, `/api/early-access`, `/forgot-password`, `/reset-password`, `/verify-email`, `/callback/*`, `/api/health`, `/api/health/worker`, and `/api/auth/*` without a session. Other API calls from a signed-out browser get 401. Other pages redirect to `/login`. Middleware runs on the edge runtime and checks only the JWT signature; pages and API routes also confirm the session row is live. The session cookie is `pb_session`, SameSite Lax, and Secure only when `APP_URL` is HTTPS. SameSite Lax is the CSRF defence for the state-changing POSTs, including connecting Spotify.
 
 ## Runtime diagram
 

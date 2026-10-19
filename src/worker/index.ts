@@ -8,7 +8,7 @@ async function main() {
   const { Worker } = await import("bullmq");
   const { QUEUE_NAME, reconcileSchedules } = await import("../lib/jobs");
   const { beatWorkerHeart, redisConnection } = await import("../lib/redis");
-  const { pruneOldActivity } = await import("../lib/activity");
+  const { pruneStale } = await import("../lib/activity");
   const { runUserCheck } = await import("../lib/blocker-run");
   const { notifyUser } = await import("../lib/mail");
   const { assertMailConfigured } = await import("../lib/env");
@@ -25,9 +25,9 @@ async function main() {
     });
   }, 10_000);
   const prune = setInterval(() => {
-    pruneOldActivity()
-      .then((count) => {
-        if (count > 0) log.info("pruned activity", { count });
+    pruneStale()
+      .then((counts) => {
+        if (Object.values(counts).some((count) => count > 0)) log.info("pruned stale rows", counts);
       })
       .catch((error) => {
         log.error("prune failed", { message: error instanceof Error ? error.message : "unknown" });

@@ -21,6 +21,7 @@ model User {
   poll       PollState?
   sessions   Session[]
   authTokens AuthToken[]
+  activeDays UserActivityDay[]
 
   @@map("users")
 }
@@ -161,4 +162,39 @@ enum ActivityResult {
   rate_limited
   quota
   broken
+}
+
+enum EarlyAccessStatus {
+  pending
+  invited
+  declined
+  joined
+}
+
+// The early-access list. Approving issues a single-use invite; only its
+// SHA-256 is stored, and a new invite replaces the old one.
+model EarlyAccessRequest {
+  id              String            @id @default(cuid())
+  email           String            @unique
+  status          EarlyAccessStatus @default(pending)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  decidedAt       DateTime?         @map("decided_at")
+  inviteTokenHash String?           @unique @map("invite_token_hash")
+  inviteExpiresAt DateTime?         @map("invite_expires_at")
+  joinedAt        DateTime?         @map("joined_at")
+
+  @@index([status, createdAt])
+  @@map("early_access_requests")
+}
+
+// One row per user per UTC day they signed in or used the site; drives the
+// operator's daily-active-users chart. Background checks never write here.
+model UserActivityDay {
+  userId String   @map("user_id")
+  day    DateTime @db.Date
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+  @@index([day])
+  @@map("user_activity_days")
 }

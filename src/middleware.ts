@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readSession, SESSION_COOKIE } from "./lib/session";
 
-const PUBLIC_PAGES = new Set(["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"]);
+const PUBLIC_PAGES = new Set(["/", "/login", "/signup", "/join", "/forgot-password", "/reset-password", "/verify-email"]);
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -10,6 +10,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/callback/") ||
     pathname === "/api/health" ||
     pathname === "/api/health/worker" ||
+    pathname === "/api/early-access" ||
     pathname.startsWith("/api/auth/")
   ) {
     return NextResponse.next();
