@@ -21,6 +21,7 @@ model User {
   poll       PollState?
   sessions   Session[]
   authTokens AuthToken[]
+  activeDays UserActivityDay[]
 
   @@map("users")
 }
@@ -184,4 +185,16 @@ model EarlyAccessRequest {
 
   @@index([status, createdAt])
   @@map("early_access_requests")
+}
+
+// One row per user per UTC day they signed in or used the site; drives the
+// operator's daily-active-users chart. Background checks never write here.
+model UserActivityDay {
+  userId String   @map("user_id")
+  day    DateTime @db.Date
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+  @@index([day])
+  @@map("user_activity_days")
 }

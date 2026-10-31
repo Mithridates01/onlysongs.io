@@ -28,6 +28,7 @@ docker compose -f docker-compose.dev.yml up -d
 | --- | --- |
 | `tests/blocker-logic.test.ts` | Playback classification, play commands, token refresh (`spotify-auth.ts`) |
 | `tests/check-plan.test.ts` | The pure check: `preflight`, `decide`, and `settleSwap` from inputs to the poll patch, activity row, and side effects |
+| `tests/admin-stats.test.ts` | The operator series: one point per UTC day, running account totals, counts outside the window ignored |
 | `tests/schemas.test.ts` | Request body schemas: normalizing and the error messages users see |
 | `tests/spotify-http.test.ts` | Retry-After, quota body, token HTTP fixtures |
 | `tests/quiet-hours.test.ts` | Quiet-hour windows and zoned midnight |
@@ -37,6 +38,7 @@ docker compose -f docker-compose.dev.yml up -d
 | `tests/mail.test.ts` | Sending through Resend's API, its error reasons, and when mail is required |
 | `tests/integration/blocker-run.test.ts` | `runUserCheck` against Postgres, Redis, and stubbed Spotify |
 | `tests/integration/api.test.ts` | Signup, login, status, enabling the blocker, and starting Spotify sign-in only with a POST |
+| `tests/integration/insights.test.ts` | A sign-in counts once per day, a returning visit on a new day counts once, the admin series reads real rows, pruning removes only stale sessions, links and active days |
 | `tests/integration/early-access.test.ts` | Requests are stored once with one answer for everyone, invite-only sign-up with the operator exception, approval emails a 14-day link, joining creates a confirmed account once, expired and declined invites, approvals limited to the operator |
 | `tests/integration/accounts.test.ts` | Logout and sign-out-others revoke sessions, email verification, password reset (signs out everywhere, single use, expiry), no account enumeration, login rate limits |
 | `tests/integration/concurrency.test.ts` | Lock ownership, single-flight token refresh, waiting on a slow refresh instead of resending its token, queued email, schedule repair |
