@@ -101,6 +101,23 @@ describe("runUserCheck against Postgres and Redis", () => {
     }
   });
 
+  it("reads the player but leaves a podcast playing when a manual check runs with the blocker off", async () => {
+    const user = await seedListener({ enabled: false });
+    created.push(user.id);
+    const spotify = stubFetch((call) => spotifyRoute(call, { player: () => jsonResponse(200, episodePlayback()) }));
+    try {
+      const summary = await runUserCheck(user.id, { ignoreCooldown: true, observeWhenOff: true });
+      expect(summary.outcome).toBe("off");
+      expect(spotify.calls).toHaveLength(1);
+      const poll = await prisma.pollState.findUniqueOrThrow({ where: { userId: user.id } });
+      expect(poll.nowPlayingKind).toBe("episode");
+      expect(poll.lastCheckedAt).not.toBeNull();
+      expect(await prisma.activityLog.count({ where: { userId: user.id } })).toBe(0);
+    } finally {
+      spotify.restore();
+    }
+  });
+
   it("leaves an allow-listed show playing and logs the skip", async () => {
     const user = await seedListener({
       failures: 3,

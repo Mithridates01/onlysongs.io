@@ -3,6 +3,7 @@ import { authorizedCall, markConnectionBroken } from "./accounts";
 import { FAILURE_WARN_AT, playBodyFor, playOutcome, type PlaybackResult, type PlayerBody, type Replacement } from "./blocker-logic";
 import {
   decide,
+  observeOnly,
   preflight,
   settleSwap,
   type CheckResult,
@@ -22,7 +23,9 @@ export type { CheckOutcome, CheckSummary } from "./check-plan";
 
 const CHECK_TIMEOUT_MS = 10_000;
 
-export async function runUserCheck(userId: string, opts?: { ignoreCooldown?: boolean }): Promise<CheckSummary> {
+type CheckOptions = { ignoreCooldown?: boolean; observeWhenOff?: boolean };
+
+export async function runUserCheck(userId: string, opts?: CheckOptions): Promise<CheckSummary> {
   const locked = await withUserLock(userId, () => runUnlocked(userId, opts));
   if ("busy" in locked) return { outcome: "busy", detail: "A check is already running." };
   return locked;
@@ -30,7 +33,7 @@ export async function runUserCheck(userId: string, opts?: { ignoreCooldown?: boo
 
 // gather → preflight → read the player → decide → swap → settle → persist.
 // The decisions are pure (check-plan.ts); this function only does I/O.
-async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }): Promise<CheckSummary> {
+async function runUnlocked(userId: string, opts?: CheckOptions): Promise<CheckSummary> {
   // Starts with the lock, so player calls end before the lock's TTL can lapse.
   // Token refresh keeps its own longer timeout (accounts.ts).
   const signal = AbortSignal.timeout(CHECK_TIMEOUT_MS);
@@ -56,6 +59,7 @@ async function runUnlocked(userId: string, opts?: { ignoreCooldown?: boolean }):
 
   const observed = await readPlayer(bundle.spotify as SpotifyConnection, signal);
   const plan = decide(observed, state, now);
+  if (gate.kind === "observe") return persist(userId, bundle.email, observeOnly(plan));
   if (!("kind" in plan)) return persist(userId, bundle.email, plan);
 
   const fresh = await prisma.spotifyConnection.findUnique({ where: { userId } });
