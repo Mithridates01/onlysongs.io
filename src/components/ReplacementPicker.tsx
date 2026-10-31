@@ -79,7 +79,7 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
 
   return (
     <section className="card" style={{ marginTop: 16 }}>
-      <h2>Replacement</h2>
+      <h2>Choose your song</h2>
       {replacement ? (
         <div className="now" style={{ marginBottom: 14 }}>
           {replacement.art ? (

@@ -10,6 +10,7 @@ The design doc covers the stack, the two processes, and the check path. Day-to-d
 | --- | --- |
 | Runtime | Node.js 22, TypeScript |
 | Web | Next.js 15 App Router, React 19 |
+| UI | One dark "calm" theme in `src/app/globals.css` (CSS variables, no framework). Sora, Geist and Geist Mono are self-hosted with `next/font`. The breathing orb (`.orb`) is the status motif and stops for reduced motion. |
 | Data | PostgreSQL 16, Prisma 6 |
 | Jobs | BullMQ 5 on Redis 7 |
 | Auth | Email and password (bcrypt, cost 12). The session is an HttpOnly cookie, a `jose` HS256 JWT that names a row in `sessions`; revoking the row ends the session. Email verification and password reset use single-use emailed links. Rate limits are Redis counters per account, per account and IP, and per IP. |

@@ -26,7 +26,7 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
   const connection = connectionState(spotify?.status, Boolean(spotify?.refreshTokenEnc), Boolean(spotify), quotaPaused);
   const worker = await readWorkerHeart();
 
-  const [blockedAllTime, blockedToday] = await Promise.all([
+  const [blockedAllTime, blockedToday, recent] = await Promise.all([
     prisma.activityLog.count({ where: { userId, result: { in: REPLACED } } }),
     prisma.activityLog.count({
       where: {
@@ -34,6 +34,12 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
         result: { in: REPLACED },
         at: { gte: startOfZonedDay(settings.timeZone) },
       },
+    }),
+    prisma.activityLog.findMany({
+      where: { userId, result: { in: REPLACED } },
+      orderBy: { at: "desc" },
+      take: 3,
+      select: { at: true, showName: true, episodeName: true },
     }),
   ]);
 
@@ -85,6 +91,7 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
     },
     blockedToday,
     blockedAllTime,
+    recent: recent.map((row) => ({ at: row.at.toISOString(), showName: row.showName, episodeName: row.episodeName })),
     replacement,
     worker,
     warnings,
