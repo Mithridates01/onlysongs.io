@@ -17,6 +17,8 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-abababababababababababababababababababababababababababababababab}
       RUN_MIGRATIONS: "1"
       PROCESS: web
+      # The smoke test signs up without an invite.
+      SIGNUPS: open
     depends_on:
       postgres:
         condition: service_healthy
