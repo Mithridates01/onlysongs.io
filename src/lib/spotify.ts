@@ -1,6 +1,7 @@
 import { classifyTokenError } from "./spotify-auth";
 import { log } from "./log";
 import type { ParsedSpotify, SpotifyKind } from "./spotify-uri";
+import type { PlayBody } from "./blocker-logic";
 
 const ACCOUNTS = "https://accounts.spotify.com";
 const API = "https://api.spotify.com/v1";
@@ -213,10 +214,14 @@ export async function getPlayback(token: string, signal?: AbortSignal, fetchImpl
   });
 }
 
+export async function getTrack(token: string, trackId: string, signal?: AbortSignal, fetchImpl?: FetchLike): Promise<ApiResult> {
+  return apiRequest({ path: `/tracks/${encodeURIComponent(trackId)}`, token, signal, fetchImpl });
+}
+
 export async function playOnDevice(opts: {
   token: string;
   deviceId?: string;
-  body: { uris: string[] } | { context_uri: string };
+  body: PlayBody;
   signal?: AbortSignal;
   fetchImpl?: FetchLike;
 }): Promise<ApiResult> {

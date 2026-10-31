@@ -16,7 +16,7 @@ import { enqueueNotify } from "./jobs";
 import { log } from "./log";
 import { withUserLock } from "./redis";
 import { readAllowedShows } from "./shows";
-import { getPlayback, playOnDevice, skipNext } from "./spotify";
+import { getPlayback, getTrack, playOnDevice, skipNext } from "./spotify";
 
 export type { CheckOutcome, CheckSummary } from "./check-plan";
 
@@ -86,14 +86,29 @@ function toPlaybackResult(result: { status: number; body: unknown; retryAfterSec
   };
 }
 
+// A failed lookup falls back to a bare track play rather than failing the swap.
+async function albumFor(connection: SpotifyConnection, replacement: Replacement, signal: AbortSignal): Promise<string | undefined> {
+  if (replacement.kind !== "track") return undefined;
+  const trackId = replacement.uri.split(":")[2];
+  if (!trackId) return undefined;
+  const call = await authorizedCall(connection, (token) => getTrack(token, trackId, signal));
+  if (!call.ok || call.result.status !== 200) return undefined;
+  const album = (call.result.body as { album?: { uri?: unknown } } | null)?.album?.uri;
+  return typeof album === "string" && album.startsWith("spotify:album:") ? album : undefined;
+}
+
 async function swapToReplacement(
   connection: SpotifyConnection,
   replacement: Replacement,
   deviceId: string | undefined,
   signal: AbortSignal,
 ): Promise<SwapOutcome> {
-  const body = playBodyFor(replacement);
-  const played = await authorizedCall(connection, (token) => playOnDevice({ token, deviceId, body, signal }));
+  const albumUri = await albumFor(connection, replacement, signal);
+  // The lookup may have refreshed the token, so play with the stored connection.
+  const latest = albumUri === undefined ? connection : await prisma.spotifyConnection.findUnique({ where: { userId: connection.userId } });
+  if (!latest) return { kind: "broken", detail: "Connection disappeared." };
+  const body = playBodyFor(replacement, albumUri);
+  const played = await authorizedCall(latest, (token) => playOnDevice({ token, deviceId, body, signal }));
   if (!played.ok) {
     if (played.broken) return { kind: "broken", detail: played.error };
     return {
