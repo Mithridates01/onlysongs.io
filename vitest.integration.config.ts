@@ -22,6 +22,7 @@ export default defineConfig({
       APP_URL: TEST_APP_URL,
       ADMIN_EMAIL: "",
       SMTP_HOST: "",
+      SIGNUPS: "open",
     },
   },
 });

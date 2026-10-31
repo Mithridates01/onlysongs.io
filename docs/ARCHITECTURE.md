@@ -46,6 +46,7 @@ Accounts are independent. One user's 429 or revoked token does not stop the othe
 | --- | --- |
 | `users` | Email, password hash, admin flag, email verified time |
 | `sessions` | One row per sign-in: expiry, revoked time, last seen, user agent |
+| `early_access_requests` | Early-access list: email, status (pending, invited, declined, joined), the SHA-256 of the current 14-day invite, and when the person joined |
 | `auth_tokens` | SHA-256 of each emailed link token, its purpose (`verify_email`, `reset_password`), expiry, and used time |
 | `spotify_connections` | Encrypted client secret and tokens, OAuth state, connection status (enum: pending, connected, broken, disconnected) |
 | `blocker_settings` | Enabled flag, interval, replacement, podcast and audiobook switches, quiet hours, allow list, time zone |
@@ -54,7 +55,7 @@ Accounts are independent. One user's 429 or revoked token does not stop the othe
 
 ### Request path
 
-Middleware allows `/`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/verify-email`, `/callback/*`, `/api/health`, `/api/health/worker`, and `/api/auth/*` without a session. Other API calls from a signed-out browser get 401. Other pages redirect to `/login`. Middleware runs on the edge runtime and checks only the JWT signature; pages and API routes also confirm the session row is live. The session cookie is `pb_session`, SameSite Lax, and Secure only when `APP_URL` is HTTPS. SameSite Lax is the CSRF defence for the state-changing POSTs, including connecting Spotify.
+Middleware allows `/`, `/login`, `/signup`, `/join`, `/api/early-access`, `/forgot-password`, `/reset-password`, `/verify-email`, `/callback/*`, `/api/health`, `/api/health/worker`, and `/api/auth/*` without a session. Other API calls from a signed-out browser get 401. Other pages redirect to `/login`. Middleware runs on the edge runtime and checks only the JWT signature; pages and API routes also confirm the session row is live. The session cookie is `pb_session`, SameSite Lax, and Secure only when `APP_URL` is HTTPS. SameSite Lax is the CSRF defence for the state-changing POSTs, including connecting Spotify.
 
 ## Runtime diagram
 

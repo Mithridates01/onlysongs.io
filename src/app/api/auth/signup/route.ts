@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { createUser, sendVerification, sessionFor } from "@/lib/auth-actions";
 import { json, parseJson, requestIp } from "@/lib/http";
+import { canSignUpDirectly } from "@/lib/early-access";
 import { MINUTE, rateLimit } from "@/lib/rate-limit";
 import { signupBody } from "@/lib/schemas";
 import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
@@ -12,6 +13,9 @@ export async function POST(request: Request) {
   const body = await parseJson(request, signupBody, "Use a valid email and a password of at least 8 characters.");
   if (!body.ok) return body.response;
   const { email, password } = body.data;
+  if (!canSignUpDirectly(email)) {
+    return json({ error: "OnlySongs is invite-only for now. Request early access and we’ll email you an invite." }, 403);
+  }
 
   try {
     const user = await createUser(email, password);

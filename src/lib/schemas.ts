@@ -90,3 +90,6 @@ export const loginBody = z.object({ email, password: z.string().min(8).max(200) 
 export const forgotBody = z.object({ email });
 export const resetBody = z.object({ token: z.string().min(20).max(100), password: newPassword });
 export const tokenBody = z.object({ token: z.string().min(20).max(100) });
+export const earlyAccessBody = z.object({ email });
+export const joinBody = z.object({ token: z.string().min(20).max(100), password: newPassword });
+export const adminDecisionBody = z.object({ action: z.enum(["approve", "decline"]) });
