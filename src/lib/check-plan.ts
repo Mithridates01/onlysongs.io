@@ -17,6 +17,7 @@ export type CheckOutcome =
   | "busy"
   | "missing"
   | "disabled"
+  | "off"
   | "paused"
   | "cooldown"
   | "quiet_hours"
@@ -86,26 +87,30 @@ export type CheckState = {
   connection: { status: string; hasRefreshToken: boolean } | null;
 };
 
-// Gates that need no Spotify call. Returns the replacement when the check should go on.
+// Gates that need no Spotify call. Returns the replacement when the check should go on,
+// or "observe" when a manual check should only read the player because the blocker is off.
 export function preflight(
   state: CheckState,
   now: Date,
-  opts?: { ignoreCooldown?: boolean },
-): { kind: "stop"; result: CheckResult } | { kind: "go"; replacement: Replacement } {
+  opts?: { ignoreCooldown?: boolean; observeWhenOff?: boolean },
+): { kind: "stop"; result: CheckResult } | { kind: "go"; replacement: Replacement } | { kind: "observe" } {
   const { settings, poll, connection } = state;
   const stop = (summary: CheckSummary, patch?: PollPatch) => ({ kind: "stop" as const, result: { summary, poll: patch } });
-  if (!settings.enabled) return stop({ outcome: "disabled" });
+  if (!settings.enabled && !opts?.observeWhenOff) return stop({ outcome: "disabled" });
   if (poll.pausedUntil && poll.pausedUntil > now) {
     return stop({ outcome: "paused", detail: `Paused until ${poll.pausedUntil.toISOString()}` });
   }
-  if (!opts?.ignoreCooldown && poll.cooldownUntil && poll.cooldownUntil > now) return stop({ outcome: "cooldown" });
-  if (isQuietNow(parseQuietHours(settings.quietHours), settings.timeZone, now)) {
-    return stop({ outcome: "quiet_hours" }, { lastCheckedAt: now, lastError: null });
+  if (settings.enabled) {
+    if (!opts?.ignoreCooldown && poll.cooldownUntil && poll.cooldownUntil > now) return stop({ outcome: "cooldown" });
+    if (isQuietNow(parseQuietHours(settings.quietHours), settings.timeZone, now)) {
+      return stop({ outcome: "quiet_hours" }, { lastCheckedAt: now, lastError: null });
+    }
   }
   if (!connection || connection.status === "disconnected" || !connection.hasRefreshToken) {
     return stop({ outcome: "not_connected" });
   }
   if (connection.status === "broken") return stop({ outcome: "broken" });
+  if (!settings.enabled) return { kind: "observe" };
   if (!settings.replacementUri || !settings.replacementKind) return stop({ outcome: "no_replacement" });
   return { kind: "go", replacement: { uri: settings.replacementUri, kind: settings.replacementKind } };
 }
@@ -163,6 +168,15 @@ export function decide(observed: PlayerObservation, state: CheckState, now: Date
     };
   }
   return { kind: "swap", target, seen };
+}
+
+// With the blocker off, a check records what is playing and changes nothing else.
+export function observeOnly(plan: CheckResult | SwapPlan): CheckResult {
+  if (!("kind" in plan)) return { ...plan, activity: undefined };
+  return {
+    summary: { outcome: "off", detail: plan.target.episodeName ?? plan.target.showName },
+    poll: { ...plan.seen, failures: "reset", lastError: null },
+  };
 }
 
 export type SwapOutcome =

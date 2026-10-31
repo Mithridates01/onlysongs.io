@@ -7,7 +7,7 @@ export async function POST() {
   const user = await requireUser();
   if (!user) return json({ error: "Sign in required." }, 401);
   try {
-    const summary = await runUserCheck(user.id, { ignoreCooldown: true });
+    const summary = await runUserCheck(user.id, { ignoreCooldown: true, observeWhenOff: true });
     const status = await buildStatus(user.id);
     return json({ ...summary, status });
   } catch (error) {
