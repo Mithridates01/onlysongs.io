@@ -11,6 +11,8 @@ const contentSecurityPolicy = [
   "img-src 'self' data: https:",
   "font-src 'self' data:",
   `connect-src 'self'${isDev ? " ws:" : ""}`,
+  // Search results can be sampled in Spotify's embed player.
+  "frame-src https://open.spotify.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   // The Connect Spotify form posts here, then redirects to Spotify's sign-in.

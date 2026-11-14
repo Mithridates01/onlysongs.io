@@ -215,7 +215,7 @@ Keep that file somewhere other than the server. Restoring is `psql` into an empt
 - Each sign-in is a row in `sessions`, so logging out, "Sign out other devices", the operator's "End sessions", and a password reset all end sessions on the server.
 - Verification and reset links are single use, expire (24 hours and 1 hour), and are stored only as SHA-256 hashes.
 - Sign-in, signup, password reset, and credential changes are rate limited in Redis per account and per IP. The IP comes from the first `X-Forwarded-For` entry, so the proxy in front must set that header.
-- Responses carry a CSP, `X-Frame-Options: DENY`, `Referrer-Policy`, and HSTS. Connecting Spotify is a POST.
+- Responses carry a CSP, `X-Frame-Options: DENY`, `Referrer-Policy`, and HSTS. The CSP allows frames only from `open.spotify.com`, for sampling search results in Spotify's embed player. Connecting Spotify is a POST.
 - The production database password in `docker-compose.yml` is for the private Docker network. Do not publish port 5432.
 - Keep `.env` on the server only. It is listed in `.gitignore`.
 - Development Mode is for personal, non-commercial use. Charging for this would need Spotify's extended quota approval.

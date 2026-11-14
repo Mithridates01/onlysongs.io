@@ -122,26 +122,28 @@ export function AccountPanel({ initial }: { initial: StatusResponse }) {
           </form>
         </section>
       </div>
-      <section className="card" style={{ marginTop: 16 }}>
-        <h2>Signed-in devices</h2>
-        <p className="help">Signs out every other browser and device. This one stays signed in.</p>
-        <button className="btn secondary" type="button" onClick={signOutOthers} disabled={pending}>
-          Sign out other devices
-        </button>
-      </section>
-      <section className="card" style={{ marginTop: 16 }}>
-        <h2>Delete everything</h2>
-        <p className="help">This removes your account, tokens, settings, and activity from this server.</p>
-        <form onSubmit={deleteAccount}>
-          <label className="field">
-            <span>Type {initial.email} to confirm</span>
-            <input value={confirm} onChange={(event) => setConfirm(event.target.value)} />
-          </label>
-          <button className="btn danger" type="submit" disabled={pending}>
-            Delete account
+      <div className="grid two" style={{ marginTop: 20, alignItems: "start" }}>
+        <section className="card">
+          <h2>Signed-in devices</h2>
+          <p className="help">Signs out every other browser and device. This one stays signed in.</p>
+          <button className="btn secondary" type="button" onClick={signOutOthers} disabled={pending}>
+            Sign out other devices
           </button>
-        </form>
-      </section>
+        </section>
+        <section className="card">
+          <h2>Delete everything</h2>
+          <p className="help">This removes your account, tokens, settings, and activity from this server.</p>
+          <form onSubmit={deleteAccount}>
+            <label className="field">
+              <span>Type {initial.email} to confirm</span>
+              <input value={confirm} onChange={(event) => setConfirm(event.target.value)} />
+            </label>
+            <button className="btn danger" type="submit" disabled={pending}>
+              Delete account
+            </button>
+          </form>
+        </section>
+      </div>
     </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ReplacementView, SearchHitView } from "@/lib/types";
+import { useSpotifySearch } from "./useSpotifySearch";
 
 type Props = {
   replacement: ReplacementView | null;
@@ -14,22 +15,10 @@ type Props = {
 export function ReplacementPicker({ replacement, readySpotify, onSaved, onError }: Props) {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"track" | "playlist" | "album">("track");
-  const [hits, setHits] = useState<SearchHitView[]>([]);
   const [paste, setPaste] = useState("");
   const [pending, setPending] = useState(false);
-
-  async function search(event: React.FormEvent) {
-    event.preventDefault();
-    onError("");
-    const response = await fetch(`/api/spotify/search?type=${kind}&q=${encodeURIComponent(query)}`);
-    const data = (await response.json()) as { hits?: SearchHitView[]; error?: string };
-    if (!response.ok) {
-      onError(data.error ?? "Search failed.");
-      setHits([]);
-      return;
-    }
-    setHits(data.hits ?? []);
-  }
+  const [sampling, setSampling] = useState<string | null>(null);
+  const { hits, setHits, searching } = useSpotifySearch(kind, query, readySpotify, onError);
 
   async function choose(hit: SearchHitView) {
     if (hit.kind !== "track" && hit.kind !== "playlist" && hit.kind !== "album") return;
@@ -55,6 +44,7 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
     }
     setHits([]);
     setQuery("");
+    setSampling(null);
     await onSaved();
   }
 
@@ -97,7 +87,7 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
       ) : (
         <p className="help">Search Spotify, or paste a track, playlist, or album link.</p>
       )}
-      <form onSubmit={search} className="row">
+      <form onSubmit={(event) => event.preventDefault()} className="row" role="search">
         <select className="inline-input" value={kind} onChange={(event) => setKind(event.target.value as typeof kind)} aria-label="Replacement type">
           <option value="track">Track</option>
           <option value="playlist">Playlist</option>
@@ -106,28 +96,42 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
         <input
           className="inline-input"
           style={{ flex: 1, minWidth: 180 }}
-          placeholder="Search Spotify"
+          type="search"
+          placeholder={readySpotify ? "Search Spotify" : "Connect Spotify to search"}
+          aria-label="Search Spotify"
           value={query}
+          disabled={!readySpotify}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <button className="btn secondary" type="submit" disabled={!readySpotify}>
-          Search
-        </button>
       </form>
+      {searching ? <p className="help" aria-live="polite">Searching…</p> : null}
       <div className="hits">
         {hits.map((hit) => (
-          <button key={hit.uri} type="button" className="hit" onClick={() => choose(hit)} disabled={pending}>
-            {hit.art ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="art sm" src={hit.art} alt="" />
-            ) : (
-              <div className="art-ph sm" />
-            )}
-            <span>
-              {hit.title}
-              <small>{hit.subtitle}</small>
-            </span>
-          </button>
+          <div key={hit.uri} className="hit-wrap">
+            <div className="hit-row">
+              <button type="button" className="hit" onClick={() => choose(hit)} disabled={pending} title="Use this">
+                {hit.art ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="art sm" src={hit.art} alt="" />
+                ) : (
+                  <div className="art-ph sm" />
+                )}
+                <span>
+                  {hit.title}
+                  <small>{hit.subtitle}</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="btn ghost sm"
+                aria-pressed={sampling === hit.uri}
+                onClick={() => setSampling((current) => (current === hit.uri ? null : hit.uri))}
+              >
+                {sampling === hit.uri ? "Hide" : "Sample"}
+              </button>
+            </div>
+            {sampling === hit.uri ? <SpotifySample hit={hit} /> : null}
+          </div>
         ))}
       </div>
       <form onSubmit={usePaste} className="row" style={{ marginTop: 12 }}>
@@ -143,5 +147,20 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
         </button>
       </form>
     </section>
+  );
+}
+
+// Spotify's embed player. It plays a 30-second preview, or the full track when
+// the browser is signed in to Spotify, without touching the user's devices.
+function SpotifySample({ hit }: { hit: SearchHitView }) {
+  return (
+    <iframe
+      className="sample"
+      title={`Sample ${hit.title}`}
+      src={`https://open.spotify.com/embed/${hit.kind}/${hit.id}?theme=0`}
+      height={hit.kind === "track" ? 80 : 152}
+      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+      loading="lazy"
+    />
   );
 }

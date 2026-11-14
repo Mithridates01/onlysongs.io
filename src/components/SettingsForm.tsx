@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AllowedShowView, SearchHitView, StatusResponse } from "@/lib/types";
+import { useSpotifySearch } from "./useSpotifySearch";
 
 const ZONES = [
   "UTC",
@@ -31,11 +32,11 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
   const [end, setEnd] = useState(initial.quietHours?.end ?? "08:00");
   const [shows, setShows] = useState<AllowedShowView[]>(initial.allowedShows);
   const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<SearchHitView[]>([]);
   const [paste, setPaste] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const { hits, setHits, searching } = useSpotifySearch("show", query, true, setError);
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -61,17 +62,6 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
       return;
     }
     setMessage(data.warning ?? "Settings saved.");
-  }
-
-  async function searchShows() {
-    setError("");
-    const response = await fetch(`/api/spotify/search?type=show&q=${encodeURIComponent(query)}`);
-    const data = (await response.json()) as { hits?: SearchHitView[]; error?: string };
-    if (!response.ok) {
-      setError(data.error ?? "Show search failed.");
-      return;
-    }
-    setHits(data.hits ?? []);
   }
 
   function addShow(hit: SearchHitView) {
@@ -108,56 +98,58 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
       {error ? <p className="error">{error}</p> : null}
       {message ? <p className="banner good">{message}</p> : null}
       <form onSubmit={save} className="grid">
-        <section className="card">
-          <h2>Polling</h2>
-          <label className="field">
-            <span>Check every {interval} seconds</span>
-            <input
-              type="range"
-              min={10}
-              max={300}
-              step={5}
-              value={interval}
-              onChange={(event) => setIntervalSeconds(Number(event.target.value))}
-            />
-          </label>
-          <label className="row">
-            <input type="checkbox" checked={podcasts} onChange={(event) => setPodcasts(event.target.checked)} />
-            Block podcasts
-          </label>
-          <label className="row">
-            <input type="checkbox" checked={audiobooks} onChange={(event) => setAudiobooks(event.target.checked)} />
-            Block audiobooks
-          </label>
-          <label className="field">
-            <span>Time zone for quiet hours and “today”</span>
-            <select value={timeZone} onChange={(event) => setTimeZone(event.target.value)}>
-              {zones.map((zone) => (
-                <option key={zone} value={zone}>
-                  {zone}
-                </option>
-              ))}
-            </select>
-          </label>
-        </section>
-        <section className="card">
-          <h2>Quiet hours</h2>
-          <label className="row">
-            <input type="checkbox" checked={quietOn} onChange={(event) => setQuietOn(event.target.checked)} />
-            Allow podcasts and audiobooks during a daily window
-          </label>
-          <div className="row" style={{ marginTop: 12 }}>
+        <div className="grid two even">
+          <section className="card">
+            <h2>Polling</h2>
             <label className="field">
-              <span>From</span>
-              <input type="time" value={start} disabled={!quietOn} onChange={(event) => setStart(event.target.value)} />
+              <span>Check every {interval} seconds</span>
+              <input
+                type="range"
+                min={10}
+                max={300}
+                step={5}
+                value={interval}
+                onChange={(event) => setIntervalSeconds(Number(event.target.value))}
+              />
+            </label>
+            <label className="row">
+              <input type="checkbox" checked={podcasts} onChange={(event) => setPodcasts(event.target.checked)} />
+              Block podcasts
+            </label>
+            <label className="row">
+              <input type="checkbox" checked={audiobooks} onChange={(event) => setAudiobooks(event.target.checked)} />
+              Block audiobooks
             </label>
             <label className="field">
-              <span>Until</span>
-              <input type="time" value={end} disabled={!quietOn} onChange={(event) => setEnd(event.target.value)} />
+              <span>Time zone for quiet hours and “today”</span>
+              <select value={timeZone} onChange={(event) => setTimeZone(event.target.value)}>
+                {zones.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone}
+                  </option>
+                ))}
+              </select>
             </label>
-          </div>
-          <p className="help">Example: 06:00 to 08:00 lets a morning show play. Outside that window, the blocker resumes.</p>
-        </section>
+          </section>
+          <section className="card">
+            <h2>Quiet hours</h2>
+            <label className="row">
+              <input type="checkbox" checked={quietOn} onChange={(event) => setQuietOn(event.target.checked)} />
+              Allow podcasts and audiobooks during a daily window
+            </label>
+            <div className="row" style={{ marginTop: 12 }}>
+              <label className="field">
+                <span>From</span>
+                <input type="time" value={start} disabled={!quietOn} onChange={(event) => setStart(event.target.value)} />
+              </label>
+              <label className="field">
+                <span>Until</span>
+                <input type="time" value={end} disabled={!quietOn} onChange={(event) => setEnd(event.target.value)} />
+              </label>
+            </div>
+            <p className="help">Example: 06:00 to 08:00 lets a morning show play. Outside that window, the blocker resumes.</p>
+          </section>
+        </div>
         <section className="card">
           <h2>Allow list</h2>
           <p className="help">One list for shows and audiobooks. A match is left playing. Save after you add or remove one.</p>
@@ -180,20 +172,18 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
             <input
               className="inline-input"
               style={{ flex: 1 }}
+              type="search"
               placeholder="Search shows"
+              aria-label="Search shows"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void searchShows();
-                }
+                // Enter would submit the settings form mid-search.
+                if (event.key === "Enter") event.preventDefault();
               }}
             />
-            <button className="btn secondary" type="button" onClick={searchShows}>
-              Search
-            </button>
           </div>
+          {searching ? <p className="help" aria-live="polite">Searching…</p> : null}
           <div className="hits">
             {hits.map((hit) => (
               <button key={hit.id} className="hit" type="button" onClick={() => addShow(hit)}>
@@ -223,7 +213,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
             </button>
           </div>
         </section>
-        <button className="btn" type="submit" disabled={pending}>
+        <button className="btn save" type="submit" disabled={pending}>
           {pending ? "Saving…" : "Save settings"}
         </button>
       </form>
