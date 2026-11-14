@@ -26,15 +26,22 @@ docker compose -f docker-compose.dev.yml up -d
 
 | Path | Role |
 | --- | --- |
-| `tests/blocker-logic.test.ts` | Playback classification, play commands, token refresh |
+| `tests/blocker-logic.test.ts` | Playback classification, play commands, token refresh (`spotify-auth.ts`) |
+| `tests/check-plan.test.ts` | The pure check: `preflight`, `decide`, and `settleSwap` from inputs to the poll patch, activity row, and side effects |
+| `tests/admin-stats.test.ts` | The operator series: one point per UTC day, running account totals, counts outside the window ignored |
+| `tests/schemas.test.ts` | Request body schemas: normalizing and the error messages users see |
 | `tests/spotify-http.test.ts` | Retry-After, quota body, token HTTP fixtures |
 | `tests/quiet-hours.test.ts` | Quiet-hour windows and zoned midnight |
 | `tests/spotify-uri.test.ts` | `spotify:` URIs and `open.spotify.com` links |
-| `tests/crypto.test.ts` | AES-256-GCM round trip and a wrong key |
+| `tests/crypto.test.ts` | Versioned AES-256-GCM round trip, a wrong key, legacy values, the previous key during rotation, a session key separate from the data key |
 | `tests/db-url.test.ts` | Default Postgres pool size per process |
+| `tests/mail.test.ts` | Sending through Resend's API, its error reasons, and when mail is required |
 | `tests/integration/blocker-run.test.ts` | `runUserCheck` against Postgres, Redis, and stubbed Spotify |
-| `tests/integration/api.test.ts` | Signup, login, status, and enabling the blocker |
-| `tests/integration/concurrency.test.ts` | Lock ownership, single-flight token refresh, refresh timeout, queued email, schedule repair |
+| `tests/integration/api.test.ts` | Signup, login, status, enabling the blocker, and starting Spotify sign-in only with a POST |
+| `tests/integration/insights.test.ts` | A sign-in counts once per day, a returning visit on a new day counts once, the admin series reads real rows, pruning removes only stale sessions, links and active days |
+| `tests/integration/early-access.test.ts` | Requests are stored once with one answer for everyone, invite-only sign-up with the operator exception, approval emails a 14-day link, joining creates a confirmed account once, expired and declined invites, approvals limited to the operator |
+| `tests/integration/accounts.test.ts` | Logout and sign-out-others revoke sessions, email verification, password reset (signs out everywhere, single use, expiry), no account enumeration, login rate limits |
+| `tests/integration/concurrency.test.ts` | Lock ownership, single-flight token refresh, waiting on a slow refresh instead of resending its token, queued email, schedule repair |
 | `tests/integration/global-setup.ts` | Creates `onlysongs_test` and applies migrations |
 | `scripts/smoke.sh` | Curl checks against a running image |
 | `scripts/load/` | Load-test runner, fake Spotify, seed, and simulated web traffic |
@@ -62,7 +69,9 @@ The other unit files cover URI parsing, quiet hours (same-day end is exclusive, 
 
 These use the dev Postgres and Redis from `docker-compose.dev.yml`. Global setup creates the database `onlysongs_test` if it is missing, then runs `prisma migrate deploy`. Redis traffic goes to database 1 (`redis://127.0.0.1:6379/1`). The dev database `blocker` and the worker heartbeat on Redis database 0 are left alone. The suite refuses any other database name or Redis index.
 
-Spotify is stubbed by replacing `globalThis.fetch` for the length of each test. Token refresh and the player calls both go through that fetch. The throwaway encryption key lives in `tests/integration/env.ts`. Mail is off because `SMTP_HOST` is cleared, so quota and breakage notices are log lines.
+Spotify is stubbed by replacing `globalThis.fetch` for the length of each test. Token refresh and the player calls both go through that fetch. The throwaway encryption key lives in `tests/integration/env.ts`. Mail is off because `SMTP_HOST` is cleared. Quota and Reconnect notices are queued as `notify` jobs, which no worker sends during tests; `tests/integration/accounts.test.ts` mocks `sendEmail` to capture verification and reset links.
+
+The test database keeps whatever migrations it last saw. After switching to a branch with fewer migrations, drop `onlysongs_test` (global setup recreates it); otherwise Prisma writes strings into enum columns and most tests fail.
 
 `runUserCheck` cases:
 
@@ -73,7 +82,7 @@ Spotify is stubbed by replacing `globalThis.fetch` for the length of each test. 
 - Quiet hours return `quiet_hours` and make no Spotify call. The failure count stays as it was.
 - A 401 refreshes once. The retry uses the new access token, and the stored refresh token is unchanged. A second 401 marks the connection broken and turns the blocker off. `invalid_grant` does the same and never reads the player.
 - Play responses 403 and 404 fall back to `POST /me/player/next`. A restricted device does not increment the failure count. A 500 after a successful player read does.
-- `QUOTA_EXCEEDED` sets that user's pause to about one hour, sets the connection to `quota_paused`, and logs `quota`.
+- `QUOTA_EXCEEDED` sets that user's pause to about one hour with `pause_reason` `quota`, leaves the connection `connected`, and logs `quota`.
 - Two overlapping checks for one user: the second returns `busy` while the Redis lock `lock:check:<userId>` is held.
 
 Route cases in `tests/integration/api.test.ts`:
@@ -127,13 +136,13 @@ The report also shows causes (stale refresh tokens presented, overlapping player
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on pull requests and on pushes to `main`.
+GitHub Actions (`.github/workflows/ci.yml`) runs on pull requests and on pushes to `dev` and `main`. Work merges into `dev`; `main` is what gets deployed.
 
 | Job | When | Steps |
 | --- | --- | --- |
-| Unit and typecheck | Every pull request and push to `main` | `npm ci`, `npm run typecheck`, `npm test` |
-| Integration | Every pull request and push to `main` | Postgres 16 and Redis 7 service containers, then `npm run test:integration` |
-| Image smoke | Push to `main` | `docker compose -f docker-compose.ci.yml up -d --build --wait`, then `scripts/smoke.sh` |
+| Unit and typecheck | Every pull request and push to `dev` or `main` | `npm ci`, `npm run typecheck`, `npm test`, `npm run build` |
+| Integration | Every pull request and push to `dev` or `main` | Postgres 16 and Redis 7 service containers, then `npm run test:integration` |
+| Image smoke | Push to `dev` or `main` | `docker compose -f docker-compose.ci.yml up -d --build --wait`, then `scripts/smoke.sh` |
 
 The image job generates a one-run encryption key in the workflow and tears the stack down afterward. A pull request does not build the image.
 

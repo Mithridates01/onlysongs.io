@@ -232,6 +232,10 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
       send(res, 204);
       return;
     }
+    if (req.method === "GET" && path.startsWith("/v1/tracks/")) {
+      send(res, 200, { id: path.slice("/v1/tracks/".length), uri: `spotify:track:${path.slice("/v1/tracks/".length)}`, album: { uri: "spotify:album:load" } });
+      return;
+    }
     if (req.method === "GET" && path === "/v1/search") {
       send(res, 200, { tracks: { items: [] }, playlists: { items: [] }, albums: { items: [] }, shows: { items: [] } });
       return;

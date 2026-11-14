@@ -1,29 +1,19 @@
 import bcrypt from "bcryptjs";
-import { adminEmail } from "./env";
+import { issueToken } from "./auth-tokens";
+import { adminEmail, appUrl } from "./env";
+import { log } from "./log";
+import { resetEmail, sendEmail, verifyEmail } from "./mail";
 import { prisma } from "./db";
-import { signSession } from "./session";
+import { startSession } from "./sessions";
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export function normalizeEmail(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const email = value.trim().toLowerCase();
-  if (!EMAIL.test(email) || email.length > 200) return null;
-  return email;
-}
-
-export function checkPassword(value: unknown): string | null {
-  if (typeof value !== "string" || value.length < 8 || value.length > 200) return null;
-  return value;
-}
-
-export async function createUser(email: string, password: string) {
+export async function createUser(email: string, password: string, opts?: { verified?: boolean }) {
   const passwordHash = await bcrypt.hash(password, 12);
   return prisma.user.create({
     data: {
       email,
       passwordHash,
       isAdmin: adminEmail() === email,
+      emailVerifiedAt: opts?.verified ? new Date() : null,
       settings: { create: {} },
       poll: { create: {} },
     },
@@ -41,12 +31,41 @@ export async function verifyLogin(email: string, password: string) {
   return user;
 }
 
-export async function sessionFor(user: { id: string; email: string; isAdmin: boolean }) {
-  return signSession({ sub: user.id, email: user.email, admin: user.isAdmin });
+export async function sessionFor(user: { id: string; email: string; isAdmin: boolean }, request?: Request) {
+  return startSession(user, request?.headers.get("user-agent"));
 }
 
 export async function nextPath(userId: string): Promise<string> {
   const connection = await prisma.spotifyConnection.findUnique({ where: { userId } });
   if (connection?.refreshTokenEnc && connection.status !== "broken") return "/dashboard";
   return "/onboarding";
+}
+
+// Email failures are logged, not thrown: the account action still succeeds and
+// the user can ask for another link.
+export async function sendVerification(user: { id: string; email: string }): Promise<boolean> {
+  try {
+    const token = await issueToken(user.id, "verify_email");
+    await sendEmail(user.email, verifyEmail(`${appUrl()}/verify-email?token=${token}`));
+    return true;
+  } catch (error) {
+    log.error("verification email failed", { message: error instanceof Error ? error.message : "unknown" });
+    return false;
+  }
+}
+
+export async function sendPasswordReset(user: { id: string; email: string }): Promise<boolean> {
+  try {
+    const token = await issueToken(user.id, "reset_password");
+    await sendEmail(user.email, resetEmail(`${appUrl()}/reset-password?token=${token}`));
+    return true;
+  } catch (error) {
+    log.error("password reset email failed", { message: error instanceof Error ? error.message : "unknown" });
+    return false;
+  }
+}
+
+export async function setPassword(userId: string, password: string): Promise<void> {
+  const passwordHash = await bcrypt.hash(password, 12);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
 }

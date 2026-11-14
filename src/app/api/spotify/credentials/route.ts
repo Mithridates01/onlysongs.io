@@ -1,27 +1,20 @@
 import { encryptString, last4 } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
-import { json, requestIp, requireUser } from "@/lib/http";
+import { json, parseJson, requestIp, requireUser } from "@/lib/http";
 import { tryUnschedule } from "@/lib/jobs";
-import { rateLimit } from "@/lib/rate-limit";
+import { MINUTE, rateLimit } from "@/lib/rate-limit";
+import { spotifyCredentials } from "@/lib/schemas";
 
 export async function POST(request: Request) {
   const user = await requireUser();
   if (!user) return json({ error: "Sign in required." }, 401);
 
-  const limit = rateLimit(`creds:${requestIp(request)}:${user.id}`, 10, 15 * 60 * 1000);
+  const limit = await rateLimit({ key: `creds:${user.id}:${requestIp(request)}`, limit: 10, windowMs: 15 * MINUTE });
   if (!limit.ok) return json({ error: "Too many credential updates. Wait a few minutes." }, 429);
 
-  let body: { clientId?: unknown; clientSecret?: unknown } | null = null;
-  try {
-    body = (await request.json()) as { clientId?: unknown; clientSecret?: unknown };
-  } catch {
-    body = null;
-  }
-  const clientId = typeof body?.clientId === "string" ? body.clientId.trim() : "";
-  const clientSecret = typeof body?.clientSecret === "string" ? body.clientSecret.trim() : "";
-  if (clientId.length < 8 || clientId.length > 80 || clientSecret.length < 8 || clientSecret.length > 200) {
-    return json({ error: "Paste the Client ID and Client Secret from the Spotify dashboard." }, 400);
-  }
+  const body = await parseJson(request, spotifyCredentials, "Paste the Client ID and Client Secret from the Spotify dashboard.");
+  if (!body.ok) return body.response;
+  const { clientId, clientSecret } = body.data;
 
   const clientSecretEnc = encryptString(clientSecret);
   const existing = await prisma.spotifyConnection.findUnique({ where: { userId: user.id } });

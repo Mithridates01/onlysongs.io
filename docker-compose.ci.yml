@@ -15,7 +15,10 @@ services:
       REDIS_URL: redis://redis:6379
       APP_URL: http://127.0.0.1:3000
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-abababababababababababababababababababababababababababababababab}
+      RUN_MIGRATIONS: "1"
       PROCESS: web
+      # The smoke test signs up without an invite.
+      SIGNUPS: open
     depends_on:
       postgres:
         condition: service_healthy

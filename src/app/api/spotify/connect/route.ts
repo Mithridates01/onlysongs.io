@@ -6,7 +6,9 @@ import { json, requireUser } from "@/lib/http";
 import { codeChallenge, createOauthState, createVerifier } from "@/lib/pkce";
 import { PLAYBACK_SCOPES } from "@/lib/spotify";
 
-export async function GET() {
+// POST, not GET: starting the flow writes a new OAuth state and PKCE verifier.
+// The SameSite=Lax session cookie keeps other sites from posting here.
+export async function POST() {
   const user = await requireUser();
   if (!user) return json({ error: "Sign in required." }, 401);
 
@@ -32,5 +34,5 @@ export async function GET() {
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("code_challenge", codeChallenge(verifier));
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, 303);
 }

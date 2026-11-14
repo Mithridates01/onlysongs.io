@@ -8,84 +8,193 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  isAdmin      Boolean  @default(false) @map("is_admin")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  isAdmin         Boolean   @default(false) @map("is_admin")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
-  spotify  SpotifyConnection?
-  settings BlockerSettings?
-  activity ActivityLog[]
-  poll     PollState?
+  spotify    SpotifyConnection?
+  settings   BlockerSettings?
+  activity   ActivityLog[]
+  poll       PollState?
+  sessions   Session[]
+  authTokens AuthToken[]
+  activeDays UserActivityDay[]
 
   @@map("users")
 }
 
 model SpotifyConnection {
-  userId              String    @id @map("user_id")
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clientId            String    @map("client_id")
-  clientSecretEnc     String    @map("client_secret_enc")
-  accessTokenEnc      String?   @map("access_token_enc")
-  refreshTokenEnc     String?   @map("refresh_token_enc")
-  expiresAt           DateTime? @map("expires_at")
-  spotifyUserId       String?   @map("spotify_user_id")
-  status              String    @default("pending")
-  codeVerifierEnc     String?   @map("code_verifier_enc")
-  oauthState          String?   @map("oauth_state")
-  oauthStateExpiresAt DateTime? @map("oauth_state_expires_at")
+  userId              String           @id @map("user_id")
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId            String           @map("client_id")
+  clientSecretEnc     String           @map("client_secret_enc")
+  accessTokenEnc      String?          @map("access_token_enc")
+  refreshTokenEnc     String?          @map("refresh_token_enc")
+  expiresAt           DateTime?        @map("expires_at")
+  spotifyUserId       String?          @map("spotify_user_id")
+  status              ConnectionStatus @default(pending)
+  codeVerifierEnc     String?          @map("code_verifier_enc")
+  oauthState          String?          @map("oauth_state")
+  oauthStateExpiresAt DateTime?        @map("oauth_state_expires_at")
 
   @@map("spotify_connections")
 }
 
 model BlockerSettings {
-  userId           String  @id @map("user_id")
-  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  enabled          Boolean @default(false)
-  intervalSeconds  Int     @default(60) @map("interval_seconds")
-  replacementUri   String? @map("replacement_uri")
-  replacementLabel String? @map("replacement_label")
-  replacementArt   String? @map("replacement_art")
-  replacementKind  String? @map("replacement_kind")
-  blockPodcasts    Boolean @default(true) @map("block_podcasts")
-  blockAudiobooks  Boolean @default(true) @map("block_audiobooks")
-  quietHours       Json?   @map("quiet_hours")
-  allowedShowIds   Json    @default("[]") @map("allowed_show_ids")
-  timeZone         String  @default("UTC") @map("time_zone")
+  userId           String           @id @map("user_id")
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled          Boolean          @default(false)
+  intervalSeconds  Int              @default(60) @map("interval_seconds")
+  replacementUri   String?          @map("replacement_uri")
+  replacementLabel String?          @map("replacement_label")
+  replacementArt   String?          @map("replacement_art")
+  replacementKind  ReplacementKind? @map("replacement_kind")
+  blockPodcasts    Boolean          @default(true) @map("block_podcasts")
+  blockAudiobooks  Boolean          @default(true) @map("block_audiobooks")
+  quietHours       Json?            @map("quiet_hours")
+  allowedShowIds   Json             @default("[]") @map("allowed_show_ids")
+  timeZone         String           @default("UTC") @map("time_zone")
 
   @@map("blocker_settings")
 }
 
 model ActivityLog {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  at          DateTime @default(now())
-  showName    String?  @map("show_name")
-  episodeName String?  @map("episode_name")
-  deviceName  String?  @map("device_name")
-  action      String
-  result      String
-  httpStatus  Int?     @map("http_status")
+  id          String         @id @default(cuid())
+  userId      String         @map("user_id")
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  at          DateTime       @default(now())
+  showName    String?        @map("show_name")
+  episodeName String?        @map("episode_name")
+  deviceName  String?        @map("device_name")
+  action      ActivityAction
+  result      ActivityResult
+  httpStatus  Int?           @map("http_status")
 
   @@index([userId, at])
   @@map("activity_log")
 }
 
 model PollState {
-  userId              String    @id @map("user_id")
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lastCheckedAt       DateTime? @map("last_checked_at")
-  cooldownUntil       DateTime? @map("cooldown_until")
-  pausedUntil         DateTime? @map("paused_until")
-  consecutiveFailures Int       @default(0) @map("consecutive_failures")
-  lastError           String?   @map("last_error")
-  nowPlayingKind      String?   @map("now_playing_kind")
-  nowPlayingTitle     String?   @map("now_playing_title")
-  nowPlayingSubtitle  String?   @map("now_playing_subtitle")
-  nowPlayingArt       String?   @map("now_playing_art")
-  quotaNotifiedAt     DateTime? @map("quota_notified_at")
+  userId              String       @id @map("user_id")
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastCheckedAt       DateTime?    @map("last_checked_at")
+  cooldownUntil       DateTime?    @map("cooldown_until")
+  pausedUntil         DateTime?    @map("paused_until")
+  pauseReason         PauseReason? @map("pause_reason")
+  consecutiveFailures Int          @default(0) @map("consecutive_failures")
+  lastError           String?      @map("last_error")
+  nowPlayingKind      String?      @map("now_playing_kind")
+  nowPlayingTitle     String?      @map("now_playing_title")
+  nowPlayingSubtitle  String?      @map("now_playing_subtitle")
+  nowPlayingArt       String?      @map("now_playing_art")
+  quotaNotifiedAt     DateTime?    @map("quota_notified_at")
 
   @@map("poll_state")
+}
+
+// One row per sign-in. The JWT carries the row id (sid); a missing, revoked or
+// expired row ends the session even though the JWT is still signed.
+model Session {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  userAgent  String?   @map("user_agent")
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// Single-use links sent by email. Only the SHA-256 of the token is stored.
+model AuthToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   String
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, purpose])
+  @@map("auth_tokens")
+}
+
+enum ConnectionStatus {
+  pending
+  connected
+  broken
+  disconnected
+}
+
+// Why poll_state.paused_until is set. Quota pauses used to be a connection status.
+enum PauseReason {
+  rate_limited
+  quota
+}
+
+enum ReplacementKind {
+  track
+  playlist
+  album
+}
+
+enum ActivityAction {
+  swap
+  fallback_next
+  skip
+  error
+}
+
+enum ActivityResult {
+  replaced
+  replaced_via_next
+  allow_listed
+  no_device
+  restricted
+  failed
+  rate_limited
+  quota
+  broken
+}
+
+enum EarlyAccessStatus {
+  pending
+  invited
+  declined
+  joined
+}
+
+// The early-access list. Approving issues a single-use invite; only its
+// SHA-256 is stored, and a new invite replaces the old one.
+model EarlyAccessRequest {
+  id              String            @id @default(cuid())
+  email           String            @unique
+  status          EarlyAccessStatus @default(pending)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  decidedAt       DateTime?         @map("decided_at")
+  inviteTokenHash String?           @unique @map("invite_token_hash")
+  inviteExpiresAt DateTime?         @map("invite_expires_at")
+  joinedAt        DateTime?         @map("joined_at")
+
+  @@index([status, createdAt])
+  @@map("early_access_requests")
+}
+
+// One row per user per UTC day they signed in or used the site; drives the
+// operator's daily-active-users chart. Background checks never write here.
+model UserActivityDay {
+  userId String   @map("user_id")
+  day    DateTime @db.Date
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+  @@index([day])
+  @@map("user_activity_days")
 }

@@ -4,10 +4,11 @@ import {
   tokenNeedsRefresh,
   type RefreshResult,
   type TokenState,
-} from "./blocker-logic";
+} from "./spotify-auth";
 import { decryptString, encryptString } from "./crypto";
 import { prisma } from "./db";
-import { enqueueNotify, removeSchedule, withRefreshLock } from "./jobs";
+import { enqueueNotify, removeSchedule } from "./jobs";
+import { withRefreshLock } from "./redis";
 import { log } from "./log";
 import { refreshTokens } from "./spotify";
 

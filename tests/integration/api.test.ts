@@ -17,6 +17,7 @@ vi.mock("next/headers", () => ({
 import { POST as signup } from "../../src/app/api/auth/signup/route";
 import { POST as login } from "../../src/app/api/auth/login/route";
 import { PUT as putSettings } from "../../src/app/api/settings/route";
+import * as connectRoute from "../../src/app/api/spotify/connect/route";
 import { GET as getStatus } from "../../src/app/api/status/route";
 import { middleware } from "../../src/middleware";
 import { encryptString } from "../../src/lib/crypto";
@@ -122,6 +123,25 @@ describe("auth and settings routes", () => {
     expect(disabled.status).toBe(200);
     const after = await getQueue().getJobSchedulers();
     expect(after.some((job) => (job.id ?? job.key) === schedulerId(user.id))).toBe(false);
+  });
+
+  it("starts Spotify sign-in only with a POST", async () => {
+    const email = uniqueEmail();
+    const signedUp = await signup(postJson("http://127.0.0.1:3000/api/auth/signup", { email, password: PASSWORD }));
+    sessionJar.token = cookieValue(signedUp);
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    await prisma.spotifyConnection.create({
+      data: { userId: user.id, clientId: "clientid1234", clientSecretEnc: encryptString("client-secret"), status: "pending" },
+    });
+
+    expect("GET" in connectRoute).toBe(false);
+    const response = await connectRoute.POST();
+    expect(response.status).toBe(303);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.origin).toBe("https://accounts.spotify.com");
+    expect(location.searchParams.get("code_challenge_method")).toBe("S256");
+    const stored = await prisma.spotifyConnection.findUniqueOrThrow({ where: { userId: user.id } });
+    expect(stored.oauthState).toBe(location.searchParams.get("state"));
   });
 });
 

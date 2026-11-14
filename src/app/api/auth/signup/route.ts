@@ -1,23 +1,26 @@
 import { Prisma } from "@prisma/client";
-import { checkPassword, createUser, normalizeEmail, sessionFor } from "@/lib/auth-actions";
-import { json, requestIp } from "@/lib/http";
-import { rateLimit } from "@/lib/rate-limit";
+import { createUser, sendVerification, sessionFor } from "@/lib/auth-actions";
+import { json, parseJson, requestIp } from "@/lib/http";
+import { canSignUpDirectly } from "@/lib/early-access";
+import { MINUTE, rateLimit } from "@/lib/rate-limit";
+import { signupBody } from "@/lib/schemas";
 import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 
 export async function POST(request: Request) {
-  const limit = rateLimit(`signup:${requestIp(request)}`, 5, 15 * 60 * 1000);
+  const limit = await rateLimit({ key: `signup:ip:${requestIp(request)}`, limit: 5, windowMs: 15 * MINUTE });
   if (!limit.ok) return json({ error: "Too many sign-up attempts. Wait a few minutes." }, 429);
 
-  const body = await readBody(request);
-  const email = normalizeEmail(body?.email);
-  const password = checkPassword(body?.password);
-  if (!email || !password) {
-    return json({ error: "Use a valid email and a password of at least 8 characters." }, 400);
+  const body = await parseJson(request, signupBody, "Use a valid email and a password of at least 8 characters.");
+  if (!body.ok) return body.response;
+  const { email, password } = body.data;
+  if (!canSignUpDirectly(email)) {
+    return json({ error: "OnlySongs is invite-only for now. Request early access and we’ll email you an invite." }, 403);
   }
 
   try {
     const user = await createUser(email, password);
-    const token = await sessionFor(user);
+    await sendVerification(user);
+    const token = await sessionFor(user, request);
     const response = json({ ok: true, next: "/onboarding" });
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;
@@ -26,13 +29,5 @@ export async function POST(request: Request) {
       return json({ error: "An account with that email already exists." }, 409);
     }
     return json({ error: "Could not create the account." }, 500);
-  }
-}
-
-async function readBody(request: Request): Promise<{ email?: unknown; password?: unknown } | null> {
-  try {
-    return (await request.json()) as { email?: unknown; password?: unknown };
-  } catch {
-    return null;
   }
 }

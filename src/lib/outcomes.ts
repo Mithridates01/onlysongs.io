@@ -36,6 +36,8 @@ export function outcomeLabel(outcome: string): string {
       return "Pick a replacement song before turning the blocker on.";
     case "disabled":
       return "The blocker is off.";
+    case "off":
+      return "A podcast or audiobook is playing. The blocker is off, so it was left alone.";
     case "busy":
       return "A check is already running.";
     case "error":
