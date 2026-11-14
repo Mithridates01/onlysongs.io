@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { ReplacementView, SearchHitView } from "@/lib/types";
+import { SampleButton } from "./SampleButton";
+import { useSamplePlayer } from "./useSamplePlayer";
 import { useSpotifySearch } from "./useSpotifySearch";
 
 type Props = {
@@ -17,7 +19,7 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
   const [kind, setKind] = useState<"track" | "playlist" | "album">("track");
   const [paste, setPaste] = useState("");
   const [pending, setPending] = useState(false);
-  const [sampling, setSampling] = useState<string | null>(null);
+  const { sample, toggle: toggleSample, stop: stopSample } = useSamplePlayer();
   const { hits, setHits, searching } = useSpotifySearch(kind, query, readySpotify, onError);
 
   async function choose(hit: SearchHitView) {
@@ -44,7 +46,7 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
     }
     setHits([]);
     setQuery("");
-    setSampling(null);
+    stopSample();
     await onSaved();
   }
 
@@ -107,30 +109,25 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
       {searching ? <p className="help" aria-live="polite">Searching…</p> : null}
       <div className="hits">
         {hits.map((hit) => (
-          <div key={hit.uri} className="hit-wrap">
-            <div className="hit-row">
-              <button type="button" className="hit" onClick={() => choose(hit)} disabled={pending} title="Use this">
-                {hit.art ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="art sm" src={hit.art} alt="" />
-                ) : (
-                  <div className="art-ph sm" />
-                )}
-                <span>
-                  {hit.title}
-                  <small>{hit.subtitle}</small>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="btn ghost sm"
-                aria-pressed={sampling === hit.uri}
-                onClick={() => setSampling((current) => (current === hit.uri ? null : hit.uri))}
-              >
-                {sampling === hit.uri ? "Hide" : "Sample"}
-              </button>
-            </div>
-            {sampling === hit.uri ? <SpotifySample hit={hit} /> : null}
+          <div key={hit.uri} className="hit-row">
+            {hit.art ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="art sm" src={hit.art} alt="" />
+            ) : (
+              <div className="art-ph sm" />
+            )}
+            <SampleButton
+              title={hit.title}
+              active={sample.uri === hit.uri}
+              playing={sample.uri === hit.uri && sample.playing}
+              loading={sample.uri === hit.uri && sample.loading}
+              progress={sample.progress}
+              onToggle={() => void toggleSample(hit.uri)}
+            />
+            <button type="button" className="hit-pick" onClick={() => choose(hit)} disabled={pending} title="Use this song">
+              {hit.title}
+              <small>{hit.subtitle}</small>
+            </button>
           </div>
         ))}
       </div>
@@ -147,20 +144,5 @@ export function ReplacementPicker({ replacement, readySpotify, onSaved, onError 
         </button>
       </form>
     </section>
-  );
-}
-
-// Spotify's embed player. It plays a 30-second preview, or the full track when
-// the browser is signed in to Spotify, without touching the user's devices.
-function SpotifySample({ hit }: { hit: SearchHitView }) {
-  return (
-    <iframe
-      className="sample"
-      title={`Sample ${hit.title}`}
-      src={`https://open.spotify.com/embed/${hit.kind}/${hit.id}?theme=0`}
-      height={hit.kind === "track" ? 80 : 152}
-      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-      loading="lazy"
-    />
   );
 }

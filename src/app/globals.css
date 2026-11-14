@@ -211,10 +211,32 @@ button.linkish { border: 0; background: none; padding: 0; color: var(--accent-te
 }
 .hit:hover { border-color: var(--line-strong); }
 .hit small { display: block; color: var(--muted); }
-.hit-wrap { display: flex; flex-direction: column; gap: 8px; }
-.hit-row { display: flex; gap: 8px; align-items: center; }
-.hit-row .hit { flex: 1; min-width: 0; }
-.sample { width: 100%; border: 0; border-radius: 12px; background: var(--deep); }
+/* A result row: cover, sample button, then the name, which picks the song. */
+.hit-row {
+  display: flex; gap: 12px; align-items: center;
+  padding: 10px; border-radius: 16px; border: 1px solid var(--line); background: var(--deep);
+}
+.hit-row:hover { border-color: var(--line-strong); }
+.hit-pick {
+  flex: 1; min-width: 0; align-self: stretch; padding: 0; border: 0; background: none;
+  color: var(--text); text-align: left; overflow-wrap: anywhere;
+}
+.hit-pick small { display: block; color: var(--muted); }
+.hit-pick:disabled { opacity: 0.6; }
+
+/* Sample button: Spotify-green face, with a ring that fills as the 30-second preview plays. */
+.sample-btn { flex: none; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; }
+.sample-btn svg { display: block; transform: rotate(-90deg); }
+.sample-btn .sample-track { fill: none; stroke: var(--line-strong); }
+.sample-btn .sample-ring { fill: none; stroke: #1ed760; stroke-linecap: round; transition: stroke-dashoffset 0.5s linear; }
+.sample-btn .sample-face { fill: #1ed760; transition: fill 0.2s; }
+.sample-btn:hover .sample-face { fill: #3be477; }
+.sample-btn .sample-icon { fill: #0b0c10; transform: rotate(90deg); transform-origin: 22px 22px; }
+.sample-btn.loading svg { animation: sample-spin 0.9s linear infinite; }
+@keyframes sample-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+@media (prefers-reduced-motion: reduce) { .sample-btn.loading svg { animation: none; } }
+/* The shared embed plays off-screen; the round button is its only control. */
+.sample-host { position: fixed; left: -10000px; top: 0; width: 300px; height: 80px; overflow: hidden; }
 input[type="search"]::-webkit-search-cancel-button { filter: invert(0.6); }
 
 .list-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding: 14px 0; border-top: 1px solid var(--line); }
