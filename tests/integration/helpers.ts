@@ -4,6 +4,7 @@ import { encryptString } from "../../src/lib/crypto";
 import { prisma } from "../../src/lib/db";
 
 export const TRACK_URI = "spotify:track:11dFghVXANMlKmJXsNCbNl";
+export const ALBUM_URI = "spotify:album:1wHHLRrwXSgYJtQWPBUC3t";
 
 export type RecordedCall = {
   url: string;
@@ -142,8 +143,11 @@ export function spotifyRoute(call: RecordedCall, handlers: {
   play?: () => Response;
   next?: () => Response;
   token?: () => Response;
+  track?: () => Response;
 }): Response {
   if (call.url.includes("/api/token")) return (handlers.token ?? unexpected(call))();
+  // Without a track handler the album lookup misses and the swap plays the bare track.
+  if (call.url.includes("/v1/tracks/")) return (handlers.track ?? (() => new Response(null, { status: 404 })))();
   if (call.url.includes("/me/player/play")) return (handlers.play ?? unexpected(call))();
   if (call.url.includes("/me/player/next")) return (handlers.next ?? unexpected(call))();
   if (call.url.includes("/me/player")) return (handlers.player ?? unexpected(call))();

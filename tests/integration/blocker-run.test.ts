@@ -3,6 +3,7 @@ import { decryptString } from "../../src/lib/crypto";
 import { prisma } from "../../src/lib/db";
 import { runUserCheck } from "../../src/lib/blocker-run";
 import {
+  ALBUM_URI,
   TRACK_URI,
   deleteUser,
   emptyResponse,
@@ -47,12 +48,13 @@ describe("runUserCheck against Postgres and Redis", () => {
     }
   });
 
-  it("replaces a playing episode with the saved track", async () => {
+  it("replaces a playing episode with the saved track, played inside its album", async () => {
     const user = await seedListener({ failures: 3 });
     created.push(user.id);
     const spotify = stubFetch((call) =>
       spotifyRoute(call, {
         player: () => jsonResponse(200, episodePlayback()),
+        track: () => jsonResponse(200, { uri: TRACK_URI, album: { uri: ALBUM_URI } }),
         play: () => emptyResponse(204),
       }),
     );
@@ -62,7 +64,7 @@ describe("runUserCheck against Postgres and Redis", () => {
       const play = callTo(spotify.calls, "/me/player/play");
       expect(play.method).toBe("PUT");
       expect(play.url).toContain("device_id=device1");
-      expect(JSON.parse(play.body ?? "")).toEqual({ uris: [TRACK_URI] });
+      expect(JSON.parse(play.body ?? "")).toEqual({ context_uri: ALBUM_URI, offset: { uri: TRACK_URI } });
       expect(play.authorization).toBe("Bearer access-old");
       const poll = await prisma.pollState.findUniqueOrThrow({ where: { userId: user.id } });
       expect(poll.nowPlayingTitle).toBe("Test Track");
@@ -75,6 +77,42 @@ describe("runUserCheck against Postgres and Redis", () => {
       expect(activity.action).toBe("swap");
       expect(activity.result).toBe("replaced");
       expect(activity.showName).toBe("Daily News");
+    } finally {
+      spotify.restore();
+    }
+  });
+
+  it("plays the bare track when the album lookup fails", async () => {
+    const user = await seedListener();
+    created.push(user.id);
+    const spotify = stubFetch((call) =>
+      spotifyRoute(call, {
+        player: () => jsonResponse(200, episodePlayback()),
+        track: () => jsonResponse(500, { error: { status: 500, message: "upstream" } }),
+        play: () => emptyResponse(204),
+      }),
+    );
+    try {
+      const summary = await runUserCheck(user.id);
+      expect(summary.outcome).toBe("replaced");
+      expect(JSON.parse(callTo(spotify.calls, "/me/player/play").body ?? "")).toEqual({ uris: [TRACK_URI] });
+    } finally {
+      spotify.restore();
+    }
+  });
+
+  it("reads the player but leaves a podcast playing when a manual check runs with the blocker off", async () => {
+    const user = await seedListener({ enabled: false });
+    created.push(user.id);
+    const spotify = stubFetch((call) => spotifyRoute(call, { player: () => jsonResponse(200, episodePlayback()) }));
+    try {
+      const summary = await runUserCheck(user.id, { ignoreCooldown: true, observeWhenOff: true });
+      expect(summary.outcome).toBe("off");
+      expect(spotify.calls).toHaveLength(1);
+      const poll = await prisma.pollState.findUniqueOrThrow({ where: { userId: user.id } });
+      expect(poll.nowPlayingKind).toBe("episode");
+      expect(poll.lastCheckedAt).not.toBeNull();
+      expect(await prisma.activityLog.count({ where: { userId: user.id } })).toBe(0);
     } finally {
       spotify.restore();
     }

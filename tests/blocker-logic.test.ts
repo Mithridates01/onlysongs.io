@@ -161,6 +161,11 @@ describe("classifyPlayback", () => {
 describe("play commands", () => {
   it("sends a track uri or a context uri", () => {
     expect(playBodyFor({ uri: "spotify:track:abc", kind: "track" })).toEqual({ uris: ["spotify:track:abc"] });
+    expect(playBodyFor({ uri: "spotify:track:abc", kind: "track" }, "spotify:album:xyz")).toEqual({
+      context_uri: "spotify:album:xyz",
+      offset: { uri: "spotify:track:abc" },
+    });
+    expect(playBodyFor({ uri: "spotify:album:abc", kind: "album" }, "spotify:album:xyz")).toEqual({ context_uri: "spotify:album:abc" });
     expect(playBodyFor({ uri: "spotify:playlist:abc", kind: "playlist" })).toEqual({ context_uri: "spotify:playlist:abc" });
     expect(playBodyFor({ uri: "spotify:album:abc", kind: "album" })).toEqual({ context_uri: "spotify:album:abc" });
   });

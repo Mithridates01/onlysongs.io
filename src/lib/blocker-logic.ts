@@ -130,8 +130,14 @@ function contextId(uri: string | undefined, expected: "show" | "audiobook"): str
   return match?.[1];
 }
 
-export function playBodyFor(replacement: Replacement): { uris: string[] } | { context_uri: string } {
-  if (replacement.kind === "track") return { uris: [replacement.uri] };
+export type PlayBody = { uris: string[] } | { context_uri: string; offset?: { uri: string } };
+
+// Spotify's clients accept a bare `uris` play with 204 and then stop, so a track
+// plays inside its album when we know the album.
+export function playBodyFor(replacement: Replacement, albumUri?: string): PlayBody {
+  if (replacement.kind === "track") {
+    return albumUri ? { context_uri: albumUri, offset: { uri: replacement.uri } } : { uris: [replacement.uri] };
+  }
   return { context_uri: replacement.uri };
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlaybackResult, PlayerBody } from "../src/lib/blocker-logic";
-import { decide, preflight, settleSwap, type CheckState, type SwapPlan } from "../src/lib/check-plan";
+import { decide, observeOnly, preflight, settleSwap, type CheckState, type SwapPlan } from "../src/lib/check-plan";
 
 const NOW = new Date("2026-10-14T12:00:00Z");
 
@@ -61,6 +61,29 @@ describe("preflight", () => {
 
   it("goes with the saved replacement", () => {
     expect(preflight(state(), NOW)).toEqual({ kind: "go", replacement: { uri: "spotify:track:abc", kind: "track" } });
+  });
+
+  it("observes when the blocker is off and the check asks to", () => {
+    const off = { settings: { enabled: false, replacementKind: null, quietHours: { start: "11:00", end: "13:00" } } };
+    expect(preflight(state(off), NOW, { observeWhenOff: true })).toEqual({ kind: "observe" });
+    expect(preflight(state({ ...off, connection: null }), NOW, { observeWhenOff: true })).toMatchObject({
+      result: { summary: { outcome: "not_connected" } },
+    });
+    expect(preflight(state(), NOW, { observeWhenOff: true }).kind).toBe("go");
+  });
+});
+
+describe("observeOnly", () => {
+  it("records a blocked episode as off without swapping or logging", () => {
+    const result = observeOnly(decide(player(EPISODE), state({ settings: { enabled: false } }), NOW));
+    expect(result).toMatchObject({ summary: { outcome: "off" }, poll: { nowPlayingKind: "episode", lastCheckedAt: NOW } });
+    expect(result.activity).toBeUndefined();
+  });
+
+  it("drops the allow-list log entry", () => {
+    const plan = decide(player(EPISODE), state({ settings: { enabled: false, allowedShowIds: ["Show1"] } }), NOW);
+    expect(observeOnly(plan)).toMatchObject({ summary: { outcome: "allow_listed" } });
+    expect(observeOnly(plan).activity).toBeUndefined();
   });
 });
 

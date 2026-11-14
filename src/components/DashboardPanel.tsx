@@ -172,11 +172,13 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
                 {status.nowPlaying.title ?? "Nothing playing"}
               </span>
               <span className="muted">{status.nowPlaying.subtitle ?? "Each check records what’s on."}</span>
-              {status.nowPlaying.blocked ? (
+              {status.nowPlaying.blocked && on ? (
                 <span className="pill bad">
                   <span className="dot apricot" aria-hidden="true" />
                   Podcast · stepping aside
                 </span>
+              ) : status.nowPlaying.blocked ? (
+                <span className="pill">Podcast · blocker off</span>
               ) : status.nowPlaying.title ? (
                 <span className="pill good">Music · left alone</span>
               ) : null}
