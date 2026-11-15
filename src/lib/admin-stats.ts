@@ -1,12 +1,9 @@
+import { DAY_MS, dayKey } from "./day";
 import { prisma } from "./db";
 
+export { dayKey };
+
 export type DayPoint = { day: string; total: number; joined: number; active: number };
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-export function dayKey(at: Date): string {
-  return at.toISOString().slice(0, 10);
-}
 
 // One point per UTC day, oldest first, ending today. total = accounts that
 // existed at the end of that day; joined = accounts created that day;

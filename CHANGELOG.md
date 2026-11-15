@@ -4,6 +4,15 @@ Changes waiting to be released, newest first. Move a section under a version hea
 
 ## Unreleased
 
+### Admin metrics and signup emails (branch `admin-metrics`)
+
+- **Setup funnel.** How many accounts reached each step: Spotify keys → Spotify sign-in → song → blocker on → first swap. It shows where people get stuck.
+- **Service health.** Blockers on, blockers that are on but not being checked, failing checks, lost Spotify access, Spotify pauses, errors and rate limits in the last 24 hours, and emails sent and failed in the last 7 days (daily tallies in Redis).
+- **Swaps chart, coming back, most swapped.** A podcasts-swapped-per-day chart that follows the 7/30/90-day range. Also weekly and monthly active users, how many accounts came back a week after signing up, and the most swapped shows across everyone.
+- **Users table.** New columns: setup stage (e.g. "Stuck at Spotify sign-in"), signed-up date and last seen. Accounts with an unconfirmed email are marked.
+- **Early access.** Longest wait, typical time to approve, invites that turned into accounts and invites that expired unused. Each waiting request shows how long it has waited.
+- **Signup emails.** A new early-access request gets an "on the list" email, and the operator (`ADMIN_EMAIL`) gets a notice with a link to approve. A new account gets a welcome email with the next step, and the operator is told. These sends don't hold up the response, and a failure is only logged.
+
 ### Support tools (branch `support-tools`)
 
 - **Account page for the operator.** Admin → click an email. It shows the account's setup and recent checks, and a "What's going on" list that explains what's stopping it in plain language.

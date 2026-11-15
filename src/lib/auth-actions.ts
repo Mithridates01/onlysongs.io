@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { issueToken } from "./auth-tokens";
 import { adminEmail, appUrl } from "./env";
 import { log } from "./log";
-import { resetEmail, sendEmail, verifyEmail } from "./mail";
+import { operatorAccountEmail, resetEmail, sendEmail, sendQuietly, verifyEmail, welcomeEmail } from "./mail";
 import { prisma } from "./db";
 import { startSession } from "./sessions";
 
@@ -18,6 +18,14 @@ export async function createUser(email: string, password: string, opts?: { verif
       poll: { create: {} },
     },
   });
+}
+
+// After a new account: a welcome to the person (skipped when a verification
+// email is going out anyway) and a notice to the operator. Not awaited.
+export function announceAccount(user: { id: string; email: string }, opts: { welcome: boolean }): void {
+  if (opts.welcome) void sendQuietly(user.email, welcomeEmail(), { userId: user.id });
+  const operator = adminEmail();
+  if (operator && operator !== user.email) void sendQuietly(operator, operatorAccountEmail(user.email), { userId: user.id });
 }
 
 // Compared against when the email has no account, so a miss costs the same

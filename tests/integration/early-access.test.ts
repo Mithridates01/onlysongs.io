@@ -21,6 +21,9 @@ vi.mock("../../src/lib/mail", async (importOriginal) => {
     sendEmail: async (to: string, email: { subject: string; text: string }) => {
       outbox.push({ to, ...email });
     },
+    sendQuietly: async (to: string, email: { subject: string; text: string }) => {
+      outbox.push({ to, ...email });
+    },
   };
 });
 
@@ -64,6 +67,22 @@ describe("early access", () => {
     expect(await prisma.earlyAccessRequest.count({ where: { email: member.email } })).toBe(0);
   });
 
+  it("emails a new requester and the operator, but not on a repeat", async () => {
+    const operator = uniqueEmail();
+    process.env.ADMIN_EMAIL = operator;
+    const email = uniqueEmail();
+    await requestAccess(post("/api/early-access", { email }));
+    await vi.waitFor(() => expect(outbox.filter((item) => item.to === email || item.to === operator)).toHaveLength(2));
+    expect(outbox.find((item) => item.to === email)?.subject).toMatch(/on the list/i);
+    const notice = outbox.find((item) => item.to === operator);
+    expect(notice?.subject).toContain(email);
+    expect(notice?.text).toContain("/admin#requests");
+
+    await requestAccess(post("/api/early-access", { email }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(outbox.filter((item) => item.to === email)).toHaveLength(1);
+  });
+
   it("blocks open sign-up while invite-only, except for the operator", async () => {
     const blocked = await signup(post("/api/auth/signup", { email: uniqueEmail(), password: "password-1" }));
     expect(blocked.status).toBe(403);
@@ -83,7 +102,7 @@ describe("early access", () => {
 
     const approved = await decide(post(`/api/admin/early-access/${request.id}`, { action: "approve" }), params(request.id));
     expect(approved.status).toBe(200);
-    const mail = outbox.find((item) => item.to === email);
+    const mail = invites().find((item) => item.to === email);
     expect(mail?.subject).toMatch(/finish creating/i);
     const token = /\/join\?token=([A-Za-z0-9_-]+)/.exec(mail?.text ?? "")?.[1] ?? "";
     const invited = await prisma.earlyAccessRequest.findUniqueOrThrow({ where: { email } });
@@ -103,6 +122,7 @@ describe("early access", () => {
 
     const again = await join(post("/api/auth/join", { token, password: "another-password-2" }));
     expect(again.status).toBe(400);
+    await vi.waitFor(() => expect(outbox.some((item) => item.to === email && /welcome/i.test(item.subject))).toBe(true));
   });
 
   it("rejects an expired or declined invite", async () => {
@@ -111,7 +131,7 @@ describe("early access", () => {
     const request = await prisma.earlyAccessRequest.findUniqueOrThrow({ where: { email } });
     await signInAsAdmin();
     await decide(post(`/api/admin/early-access/${request.id}`, { action: "approve" }), params(request.id));
-    const token = /\/join\?token=([A-Za-z0-9_-]+)/.exec(outbox.at(-1)?.text ?? "")?.[1] ?? "";
+    const token = /\/join\?token=([A-Za-z0-9_-]+)/.exec(invites().at(-1)?.text ?? "")?.[1] ?? "";
 
     await prisma.earlyAccessRequest.update({ where: { email }, data: { inviteExpiresAt: new Date(Date.now() - 1000) } });
     expect(await findInvite(token)).toBeNull();
@@ -130,7 +150,7 @@ describe("early access", () => {
     sessionJar.token = await startSession({ id: member.id, email: member.email, isAdmin: false });
     const response = await decide(post(`/api/admin/early-access/${request.id}`, { action: "approve" }), params(request.id));
     expect(response.status).toBe(404);
-    expect(outbox).toHaveLength(0);
+    expect(invites()).toHaveLength(0);
   });
 
   it("gives no operator rights to an admin email that isn't verified", async () => {
@@ -140,10 +160,15 @@ describe("early access", () => {
     await signInAsAdmin({ verified: false });
     const response = await decide(post(`/api/admin/early-access/${request.id}`, { action: "approve" }), params(request.id));
     expect(response.status).toBe(404);
-    expect(outbox).toHaveLength(0);
+    expect(invites()).toHaveLength(0);
     expect((await prisma.earlyAccessRequest.findUniqueOrThrow({ where: { email } })).status).toBe("pending");
   });
 });
+
+// Only invite emails; confirmations and operator notices are sent alongside.
+function invites() {
+  return outbox.filter((item) => /finish creating/i.test(item.subject));
+}
 
 async function signInAsAdmin(opts?: { verified?: boolean }): Promise<void> {
   const admin = await seedListener({ email: uniqueEmail() });

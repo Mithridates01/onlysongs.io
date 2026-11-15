@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { SwapPoint } from "@/lib/admin-metrics";
 import type { DayPoint } from "@/lib/admin-stats";
 
 const RANGES = [7, 30, 90] as const;
@@ -15,10 +16,13 @@ function label(day: string): string {
   return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-export function AdminCharts({ series, pending }: { series: DayPoint[]; pending: number }) {
+export function AdminCharts({ series, swaps: swapSeries, pending }: { series: DayPoint[]; swaps: SwapPoint[]; pending: number }) {
   const [range, setRange] = useState<(typeof RANGES)[number]>(30);
   const [hover, setHover] = useState<number | null>(null);
   const data = series.slice(-range);
+  const swaps = swapSeries.slice(-range);
+  const swapsInRange = swaps.reduce((sum, point) => sum + point.swaps, 0);
+  const swapTicks = ticks(Math.max(...swaps.map((point) => point.swaps)));
   const n = data.length;
   const shown = hover !== null && hover < n ? hover : n - 1;
   const today = data[n - 1];
@@ -121,6 +125,30 @@ export function AdminCharts({ series, pending }: { series: DayPoint[]; pending: 
                   minHeight: point.active ? 2 : 0,
                   borderRadius: "4px 4px 0 0",
                   background: "#B4A8F5",
+                  opacity: i === shown ? 1 : 0.55,
+                }}
+              />
+            ))}
+          </div>
+          <HoverStrip count={n} onHover={setHover} />
+        </ChartCard>
+        <ChartCard
+          title="Podcasts swapped"
+          readout={`${label(swaps[shown].day)} · ${swaps[shown].swaps} swapped`}
+          ticks={swapTicks.labels}
+          first={swaps[0].day}
+          last={swaps[swaps.length - 1].day}
+        >
+          <div role="img" aria-label={`${swapsInRange} podcasts swapped over ${range} days`} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-end", gap: n > 40 ? 1 : 2 }}>
+            {swaps.map((point, i) => (
+              <div
+                key={point.day}
+                style={{
+                  flex: 1,
+                  height: `${(point.swaps / swapTicks.top) * 100}%`,
+                  minHeight: point.swaps ? 2 : 0,
+                  borderRadius: "4px 4px 0 0",
+                  background: "var(--accent)",
                   opacity: i === shown ? 1 : 0.55,
                 }}
               />
