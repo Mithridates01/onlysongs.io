@@ -138,7 +138,7 @@ describe("locks and token refresh across processes", () => {
     expect(await getQueue().getJobScheduler(schedulerId(user.id))).toBeFalsy();
     await reconcileSchedules({ onlyMissing: true });
     const restored = await getQueue().getJobScheduler(schedulerId(user.id));
-    expect(Number(restored?.every)).toBe(60_000);
+    expect(Number(restored?.every)).toBe(5_000);
     await removeSchedule(user.id);
   });
 });

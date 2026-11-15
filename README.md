@@ -100,7 +100,7 @@ Every interval (10–300 seconds, default 60):
 
 Quiet hours skip the Spotify call. One allow list leaves a show or an audiobook playing.
 
-Spotify does not push playback changes, so some of a podcast always plays before the swap. At 60 seconds that is about 30 seconds on average.
+Spotify does not push playback changes, so some of a podcast always plays before the swap. New accounts check every 5 seconds (about 3 seconds of podcast on average); the range is 5 to 300 seconds.
 
 ## Tests
 

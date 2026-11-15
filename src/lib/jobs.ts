@@ -20,7 +20,7 @@ export function schedulerId(userId: string): string {
 }
 
 function everyMs(intervalSeconds: number): number {
-  return Math.max(10, intervalSeconds) * 1000;
+  return Math.max(5, intervalSeconds) * 1000;
 }
 
 export async function scheduleUser(userId: string, intervalSeconds: number): Promise<void> {

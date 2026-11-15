@@ -22,8 +22,8 @@ describe("settingsPatch", () => {
   });
 
   it("rejects bad values with the message users see", () => {
-    expect(error({ intervalSeconds: 5 })).toBe("Poll interval must be between 10 and 300 seconds.");
-    expect(error({ intervalSeconds: 12.5 })).toBe("Poll interval must be between 10 and 300 seconds.");
+    expect(error({ intervalSeconds: 4 })).toBe("Poll interval must be between 5 and 300 seconds.");
+    expect(error({ intervalSeconds: 12.5 })).toBe("Poll interval must be between 5 and 300 seconds.");
     expect(error({ timeZone: "Mars/Olympus" })).toBe("That time zone is not recognized.");
     expect(error({ quietHours: { start: "25:00", end: "07:00" } })).toBe("Quiet hours use 24-hour times like 06:00.");
     expect(error({ quietHours: { start: "06:00", end: "06:00:00" } })).toBe("Quiet hours need a start and end that differ.");
