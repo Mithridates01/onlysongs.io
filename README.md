@@ -66,6 +66,7 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `ENCRYPTION_KEY` | Yes | 32 bytes as 64 hex characters. The root key: HKDF derives separate keys from it for Spotify secrets at rest and for session cookies. |
 | `ENCRYPTION_KEY_PREVIOUS` | Rotation only | The old root key while rotating. Values under it still decrypt; `npm run reencrypt -- --apply` rewrites them under the new key. Rotating also signs everyone out. |
 | `SESSION_SECRET` | No | At least 32 characters. Signs session cookies instead of the key derived from `ENCRYPTION_KEY`. |
+| `SENTRY_DSN` | No | Sends server and worker errors to Sentry (errors only; no cookies, headers or bodies). Off when unset. |
 | `ADMIN_EMAIL` | No | This address becomes the operator once its email is verified, and can always sign up. |
 | `SIGNUPS` | No | `invite` (default): sign-up only through an approved early-access invite. `open`: anyone can create an account. |
 | `APP_DOMAIN` | Self-hosted only | Hostname only, such as `onlysongs.io`. Caddy requests a certificate for it. |
@@ -101,6 +102,13 @@ Every interval (10–300 seconds, default 60):
 Quiet hours skip the Spotify call. One allow list leaves a show or an audiobook playing.
 
 Spotify does not push playback changes, so some of a podcast always plays before the swap. New accounts check every 5 seconds (about 3 seconds of podcast on average); the range is 5 to 300 seconds.
+
+## Troubleshooting an account
+
+- **Admin → click an email** opens that account: its Spotify, blocker and check state, recent activity, and a "What's going on" list that names what is stopping it (for example, Spotify sign-in that started but never came back).
+- **Logs** (`railway logs --service web` or `worker`) tag each step with the account's internal id, never its email: `spotify keys saved`, `spotify sign-in started`, `spotify sign-in failed` (with the reason), `spotify connected`, `settings saved` or `settings refused`, `spotify connection broken`.
+- **Errors** go to Sentry when `SENTRY_DSN` is set, including handled ones logged with `log.error`.
+- **Read-only database access**: `scripts/support-readonly.sql` creates a `support_ro` login that can read only secret-free views in a `support` schema. Run it once as the database owner, with your own password.
 
 ## Tests
 

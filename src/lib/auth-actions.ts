@@ -57,7 +57,7 @@ export async function sendVerification(user: { id: string; email: string }): Pro
     await sendEmail(user.email, verifyEmail(`${appUrl()}/verify-email?token=${token}`));
     return true;
   } catch (error) {
-    log.error("verification email failed", { message: error instanceof Error ? error.message : "unknown" });
+    log.error("verification email failed", { userId: user.id, message: error instanceof Error ? error.message : "unknown" });
     return false;
   }
 }
@@ -68,7 +68,7 @@ export async function sendPasswordReset(user: { id: string; email: string }): Pr
     await sendEmail(user.email, resetEmail(`${appUrl()}/reset-password?token=${token}`));
     return true;
   } catch (error) {
-    log.error("password reset email failed", { message: error instanceof Error ? error.message : "unknown" });
+    log.error("password reset email failed", { userId: user.id, message: error instanceof Error ? error.message : "unknown" });
     return false;
   }
 }

@@ -3,6 +3,7 @@ import { safeEqual, decryptString, encryptString } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 import { appUrl, redirectUri } from "@/lib/env";
 import { currentSession } from "@/lib/http";
+import { log } from "@/lib/log";
 import { exchangeCode, getMe } from "@/lib/spotify";
 
 export async function GET(request: Request) {
@@ -12,12 +13,14 @@ export async function GET(request: Request) {
   const state = url.searchParams.get("state");
   const session = await currentSession();
   if (!session) return NextResponse.redirect(new URL("/login", appUrl()));
-  if (oauthError) return back(oauthError === "access_denied" ? "access_denied" : "token");
-  if (!code || !state) return back("missing_code");
+  const userId = session.sub;
+  if (oauthError) return back(userId, oauthError === "access_denied" ? "access_denied" : "token", oauthError);
+  if (!code || !state) return back(userId, "missing_code");
 
   const connection = await prisma.spotifyConnection.findUnique({ where: { userId: session.sub } });
-  if (!connection?.oauthState || !connection.codeVerifierEnc || !connection.oauthStateExpiresAt) return back("state");
-  if (connection.oauthStateExpiresAt < new Date() || !safeEqual(connection.oauthState, state)) return back("state");
+  if (!connection?.oauthState || !connection.codeVerifierEnc || !connection.oauthStateExpiresAt) return back(userId, "state", "no sign-in in progress");
+  if (connection.oauthStateExpiresAt < new Date()) return back(userId, "state", "sign-in took longer than 10 minutes");
+  if (!safeEqual(connection.oauthState, state)) return back(userId, "state", "state mismatch");
 
   const verifier = decryptString(connection.codeVerifierEnc);
   const clientSecret = decryptString(connection.clientSecretEnc);
@@ -33,7 +36,10 @@ export async function GET(request: Request) {
     redirectUri: redirectUri(),
     codeVerifier: verifier,
   });
-  if (!tokens.ok || !tokens.refreshToken) return back(tokens.ok ? "token" : tokens.invalidGrant ? "invalid_grant" : "token");
+  if (!tokens.ok || !tokens.refreshToken) {
+    const reason = tokens.ok ? "token" : tokens.invalidGrant ? "invalid_grant" : "token";
+    return back(userId, reason, tokens.ok ? "no refresh token returned" : tokens.error);
+  }
 
   const me = await getMe(tokens.accessToken);
   const spotifyUserId =
@@ -52,9 +58,12 @@ export async function GET(request: Request) {
     },
   });
 
+  log.info("spotify connected", { userId, spotifyUser: Boolean(spotifyUserId) });
   return NextResponse.redirect(new URL("/dashboard", appUrl()));
 }
 
-function back(error: string) {
+// Sends the user back to setup with a reason, and logs why for the operator.
+function back(userId: string, error: string, detail?: string) {
+  log.info("spotify sign-in failed", { userId, reason: error, detail: detail?.slice(0, 200) });
   return NextResponse.redirect(new URL(`/onboarding?error=${encodeURIComponent(error)}`, appUrl()));
 }

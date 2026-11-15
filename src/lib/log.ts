@@ -23,14 +23,24 @@ function sanitize(value: unknown): unknown {
   return out;
 }
 
+type ErrorReporter = (msg: string, extra: Record<string, unknown>) => void;
+let reportError: ErrorReporter | null = null;
+
+// Lets error tracking (src/lib/sentry.ts) receive log.error lines without this
+// module importing it.
+export function setErrorReporter(reporter: ErrorReporter | null): void {
+  reportError = reporter;
+}
+
 function write(level: "info" | "error", msg: string, extra?: Record<string, unknown>) {
-  const line = JSON.stringify({
-    level,
-    msg,
-    ...(extra ? (sanitize(extra) as Record<string, unknown>) : {}),
-  });
-  if (level === "error") console.error(line);
-  else console.log(line);
+  const clean = extra ? (sanitize(extra) as Record<string, unknown>) : {};
+  const line = JSON.stringify({ level, msg, ...clean });
+  if (level === "error") {
+    console.error(line);
+    reportError?.(msg, clean);
+  } else {
+    console.log(line);
+  }
 }
 
 export const log = {

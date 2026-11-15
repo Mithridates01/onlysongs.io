@@ -1,4 +1,5 @@
 import { isOperator } from "./admin";
+import { connectionState } from "./connection-state";
 import { FAILURE_WARN_AT } from "./blocker-logic";
 import { last4 } from "./crypto";
 import { prisma } from "./db";
@@ -6,8 +7,8 @@ import { redirectUri } from "./env";
 import { readWorkerHeart } from "./redis";
 import { isQuietNow, parseQuietHours, startOfZonedDay } from "./quiet-hours";
 import { readAllowedShows } from "./shows";
-import type { ActivityResult, ConnectionStatus } from "@prisma/client";
-import type { ConnectionState, ReplacementView, StatusResponse, StatusWarning } from "./types";
+import type { ActivityResult } from "@prisma/client";
+import type { ReplacementView, StatusResponse, StatusWarning } from "./types";
 
 const REPLACED: ActivityResult[] = ["replaced", "replaced_via_next"];
 
@@ -100,16 +101,4 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
     email: user.email,
     isAdmin: isOperator(user),
   };
-}
-
-function connectionState(
-  status: ConnectionStatus | undefined,
-  hasRefresh: boolean,
-  hasRow: boolean,
-  quotaPaused: boolean,
-): ConnectionState {
-  if (!hasRow || !status || status === "disconnected") return "disconnected";
-  if (status === "broken") return "broken";
-  if (!hasRefresh) return "needs_connect";
-  return quotaPaused ? "quota_paused" : "connected";
 }
