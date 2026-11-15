@@ -4,6 +4,11 @@ Changes waiting to be released, newest first. Move a section under a version hea
 
 ## Unreleased
 
+### Settings save on their own; the dashboard says why the switch is off (branch `settings-autosave`)
+
+- **Settings autosave.** Polling, blocking, time zone, quiet hours and the allow list now save about half a second after each change, with a "Saving… / All changes saved." line. The Save button is gone. Before, these only saved from a button at the bottom, so leaving the page dropped changes without a word. Leaving mid-edit still sends the change.
+- **Why the switch is greyed out.** When the blocker can't be turned on, the dashboard says why under the switch: no Spotify app yet, Spotify sign-in didn't finish (with the redirect URI to add), Spotify revoked access, or no replacement song.
+
 ### Poll every 5 seconds by default (branch `poll-5s`)
 
 - New accounts check every 5 seconds instead of 60, so a podcast plays for about 3 seconds on average before the swap. The allowed range is now 5–300 seconds (was 10–300). Existing accounts keep their setting.
