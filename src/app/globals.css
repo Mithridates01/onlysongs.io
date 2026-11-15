@@ -255,7 +255,7 @@ td { color: var(--body); }
 
 /* On wider screens, card buttons size to their label instead of filling the card. */
 @media (min-width: 801px) {
-  .card > .btn, .card form > .btn, .btn.save { align-self: flex-start; justify-self: start; min-width: 200px; }
+  .card > .btn, .card form > .btn { align-self: flex-start; justify-self: start; min-width: 200px; }
 }
 
 @media (max-width: 800px) {
