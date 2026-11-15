@@ -1,4 +1,4 @@
-import { sessionFor } from "@/lib/auth-actions";
+import { announceAccount, sessionFor } from "@/lib/auth-actions";
 import { acceptInvite } from "@/lib/early-access";
 import { json, parseJson, requestIp } from "@/lib/http";
 import { MINUTE, rateLimit } from "@/lib/rate-limit";
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
   if (!body.ok) return body.response;
   const user = await acceptInvite(body.data.token, body.data.password);
   if (!user) return json({ error: "This invite is invalid, expired, or already used." }, 400);
+  announceAccount(user, { welcome: true });
   const token = await sessionFor(user, request);
   const response = json({ ok: true, next: "/onboarding" });
   response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
