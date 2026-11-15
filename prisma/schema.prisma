@@ -47,7 +47,7 @@ model BlockerSettings {
   userId           String           @id @map("user_id")
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   enabled          Boolean          @default(false)
-  intervalSeconds  Int              @default(60) @map("interval_seconds")
+  intervalSeconds  Int              @default(5) @map("interval_seconds")
   replacementUri   String?          @map("replacement_uri")
   replacementLabel String?          @map("replacement_label")
   replacementArt   String?          @map("replacement_art")

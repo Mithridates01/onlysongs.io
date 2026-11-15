@@ -4,6 +4,12 @@ Changes waiting to be released, newest first. Move a section under a version hea
 
 ## Unreleased
 
+### Poll every 5 seconds by default (branch `poll-5s`)
+
+- New accounts check every 5 seconds instead of 60, so a podcast plays for about 3 seconds on average before the swap. The allowed range is now 5–300 seconds (was 10–300). Existing accounts keep their setting.
+- The 15-second cooldown after a swap and the per-user check lock are unchanged, so faster polling can't cause double swaps or overlapping checks.
+- Migration `poll_default_5s` changes only the column default.
+
 ### Audit fixes (branch `audit-fixes`)
 
 - **Next.js 15.5.29.** Fixes a critical advisory (remote code execution in the image optimizer with SVGs, GHSA-2464-fhr4-w9xw) and a denial-of-service advisory (GHSA-p3m5-59mp-jv5r). nodemailer 10.5.0 fixes two SMTP header-injection advisories.

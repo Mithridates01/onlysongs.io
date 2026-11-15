@@ -72,10 +72,10 @@ export const settingsPatch = z
   .object({
     enabled: z.boolean("enabled must be true or false."),
     intervalSeconds: z
-      .number("Poll interval must be between 10 and 300 seconds.")
-      .int("Poll interval must be between 10 and 300 seconds.")
-      .min(10, "Poll interval must be between 10 and 300 seconds.")
-      .max(300, "Poll interval must be between 10 and 300 seconds."),
+      .number("Poll interval must be between 5 and 300 seconds.")
+      .int("Poll interval must be between 5 and 300 seconds.")
+      .min(5, "Poll interval must be between 5 and 300 seconds.")
+      .max(300, "Poll interval must be between 5 and 300 seconds."),
     blockPodcasts: z.boolean("blockPodcasts must be true or false."),
     blockAudiobooks: z.boolean("blockAudiobooks must be true or false."),
     timeZone: z.string().refine(isTimeZone, "That time zone is not recognized."),

@@ -93,7 +93,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
       <p className="lede">
         Spotify does not push playback changes, so some of a podcast will always play before the swap. At {interval} seconds,
         expect about {Math.round(interval / 2)} seconds on average. Shorter intervals catch episodes sooner and spend more of
-        your Spotify quota. Anything under 10 seconds is rejected.
+        your Spotify quota. Anything under 5 seconds is rejected.
       </p>
       {error ? <p className="error">{error}</p> : null}
       {message ? <p className="banner good">{message}</p> : null}
@@ -105,7 +105,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
               <span>Check every {interval} seconds</span>
               <input
                 type="range"
-                min={10}
+                min={5}
                 max={300}
                 step={5}
                 value={interval}
