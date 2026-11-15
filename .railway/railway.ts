@@ -8,7 +8,9 @@ export default defineRailway(() => {
   const db = postgres("postgres");
   const cache = redis("redis");
 
-  const source = github("Mithridates01/onlysongs.io", { branch: "main" });
+  // Pushes to main deploy automatically once GitHub's checks pass (CI in
+  // .github/workflows/ci.yml), so a failing build never goes live.
+  const source = github("Mithridates01/onlysongs.io", { branch: "main", checkSuites: true });
   const build = { builder: "DOCKERFILE" as const };
   // Advisory-locked, so web and worker can both run it on the same deploy.
   const migrate = "node_modules/.bin/prisma migrate deploy";
