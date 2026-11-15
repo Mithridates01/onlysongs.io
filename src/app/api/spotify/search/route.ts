@@ -1,6 +1,7 @@
 import { authorizedCall } from "@/lib/accounts";
 import { prisma } from "@/lib/db";
 import { json, requireUser } from "@/lib/http";
+import { MINUTE, rateLimit } from "@/lib/rate-limit";
 import { searchCatalog } from "@/lib/spotify";
 
 const TYPES = new Set(["track", "playlist", "album", "show"]);
@@ -8,6 +9,9 @@ const TYPES = new Set(["track", "playlist", "album", "show"]);
 export async function GET(request: Request) {
   const user = await requireUser();
   if (!user) return json({ error: "Sign in required." }, 401);
+  // Search runs as the user types (debounced), so this allows brisk typing but not a loop.
+  const limit = await rateLimit({ key: `search:${user.id}`, limit: 60, windowMs: MINUTE });
+  if (!limit.ok) return json({ error: "Too many searches. Wait a moment." }, 429);
 
   const url = new URL(request.url);
   const type = url.searchParams.get("type") ?? "track";

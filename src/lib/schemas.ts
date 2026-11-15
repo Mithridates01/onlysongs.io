@@ -34,6 +34,20 @@ const allowedShow = z.object({
   name: z.string().trim().min(1, "A show on the allow list is incomplete.").max(200, "A show on the allow list looks invalid."),
 });
 
+// Cover art is shown back to the user, so only Spotify's image CDNs are kept;
+// anything else is dropped (no art) rather than rejected.
+export function spotifyImageUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const host = url.hostname;
+    const spotifyHost = host === "scdn.co" || host.endsWith(".scdn.co") || host.endsWith(".spotifycdn.com");
+    return url.protocol === "https:" && spotifyHost ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 const replacement = z
   .object({
     uri: z.string(),
@@ -51,7 +65,7 @@ const replacement = z
       ctx.addIssue({ code: "custom", message: "The replacement type does not match its Spotify link." });
       return z.NEVER;
     }
-    return { uri: parsed.uri, label: value.label, art: value.art || null, kind: parsed.kind };
+    return { uri: parsed.uri, label: value.label, art: spotifyImageUrl(value.art), kind: parsed.kind };
   });
 
 export const settingsPatch = z
@@ -77,9 +91,20 @@ export const settingsPatch = z
 
 export type SettingsPatch = z.infer<typeof settingsPatch>;
 
+// Spotify issues both as 32 hexadecimal characters; checking here catches a
+// mis-paste now instead of at the Spotify sign-in step.
 export const spotifyCredentials = z.object({
-  clientId: z.string().trim().min(8).max(80),
-  clientSecret: z.string().trim().min(8).max(200),
+  clientId: z
+    .string("Paste the Client ID from the Spotify dashboard.")
+    .trim()
+    .regex(/^[0-9a-fA-F]{32}$/, "That Client ID doesn’t look right. It’s 32 letters and numbers, shown at the top of your app’s Settings."),
+  clientSecret: z
+    .string("Paste the Client Secret from the Spotify dashboard.")
+    .trim()
+    .regex(
+      /^[0-9a-fA-F]{32}$/,
+      "That Client Secret doesn’t look right. Click “View client secret” in your app’s Settings and copy all 32 characters.",
+    ),
 });
 
 const email = z.string().trim().toLowerCase().max(200).pipe(z.email());

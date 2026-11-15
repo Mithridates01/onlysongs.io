@@ -1,13 +1,12 @@
 import { declineRequest, sendInvite } from "@/lib/early-access";
-import { json, parseJson, requireUser } from "@/lib/http";
+import { json, parseJson, requireOperator } from "@/lib/http";
 import { log } from "@/lib/log";
 import { adminDecisionBody } from "@/lib/schemas";
 
 // Operator only. "approve" sends (or re-sends) the 14-day invite email.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireUser();
-  if (!admin) return json({ error: "Sign in required." }, 401);
-  if (!admin.isAdmin) return json({ error: "Not found." }, 404);
+  // Anyone else, signed in or not, gets the same answer as a missing route.
+  if (!(await requireOperator())) return json({ error: "Not found." }, 404);
   const body = await parseJson(request, adminDecisionBody);
   if (!body.ok) return body.response;
   const { id } = await params;

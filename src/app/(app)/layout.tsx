@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { VerifyBanner } from "@/components/AccountFlows";
 import { Shell } from "@/components/Shell";
+import { isOperator } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { currentSession } from "@/lib/http";
 
@@ -12,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await prisma.user.findUnique({ where: { id: session.sub } });
   if (!user) redirect("/login");
   return (
-    <Shell email={user.email} admin={user.isAdmin}>
+    <Shell email={user.email} admin={isOperator(user)}>
       {user.emailVerifiedAt ? null : <VerifyBanner />}
       {children}
     </Shell>

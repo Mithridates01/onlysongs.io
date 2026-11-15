@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
 import "./globals.css";
 
@@ -15,7 +16,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#0B0C10", colorScheme: "dark" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Reading the request makes every page render per request, so Next can stamp
+  // each page's scripts with that request's CSP nonce (see src/middleware.ts).
+  await headers();
   return (
     <html lang="en" className={`${sora.variable} ${geist.variable} ${geistMono.variable}`}>
       <body>{children}</body>
