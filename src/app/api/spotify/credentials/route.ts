@@ -2,6 +2,7 @@ import { encryptString, last4 } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 import { json, parseJson, requestIp, requireUser } from "@/lib/http";
 import { tryUnschedule } from "@/lib/jobs";
+import { log } from "@/lib/log";
 import { MINUTE, rateLimit } from "@/lib/rate-limit";
 import { spotifyCredentials } from "@/lib/schemas";
 
@@ -13,7 +14,10 @@ export async function POST(request: Request) {
   if (!limit.ok) return json({ error: "Too many credential updates. Wait a few minutes." }, 429);
 
   const body = await parseJson(request, spotifyCredentials);
-  if (!body.ok) return body.response;
+  if (!body.ok) {
+    log.info("spotify keys refused", { userId: user.id });
+    return body.response;
+  }
   const { clientId, clientSecret } = body.data;
 
   const clientSecretEnc = encryptString(clientSecret);
@@ -42,5 +46,6 @@ export async function POST(request: Request) {
     await tryUnschedule(user.id);
   }
 
+  log.info("spotify keys saved", { userId: user.id, replaced: Boolean(existing) });
   return json({ ok: true, clientIdLast4: last4(clientId) });
 }

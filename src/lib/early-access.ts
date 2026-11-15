@@ -3,7 +3,7 @@ import type { EarlyAccessRequest } from "@prisma/client";
 import { createUser } from "./auth-actions";
 import { prisma } from "./db";
 import { adminEmail, appUrl } from "./env";
-import { inviteEmail, sendEmail } from "./mail";
+import { inviteEmail, operatorRequestEmail, requestReceivedEmail, sendEmail, sendQuietly } from "./mail";
 
 export const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -24,10 +24,20 @@ function hash(token: string): string {
 
 // Adds the email to the list. Repeat requests, declined requests and existing
 // accounts are all left as they are, so the caller always answers the same way.
+// A new request emails the person and the operator. Those sends aren't awaited,
+// so a new request takes no longer to answer than a repeat.
 export async function requestEarlyAccess(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (user) return;
-  await prisma.earlyAccessRequest.upsert({ where: { email }, create: { email }, update: {} });
+  const existing = await prisma.earlyAccessRequest.findUnique({ where: { email }, select: { id: true } });
+  if (existing) return;
+  const created = await prisma.earlyAccessRequest
+    .create({ data: { email }, select: { id: true } })
+    .catch(() => null); // a simultaneous duplicate request lost the race
+  if (!created) return;
+  void sendQuietly(email, requestReceivedEmail(), { requestId: created.id });
+  const operator = adminEmail();
+  if (operator) void sendQuietly(operator, operatorRequestEmail(email), { requestId: created.id });
 }
 
 // Approves (or re-sends) an invite: a fresh 14-day single-use link replaces any

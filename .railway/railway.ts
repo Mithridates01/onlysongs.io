@@ -8,7 +8,9 @@ export default defineRailway(() => {
   const db = postgres("postgres");
   const cache = redis("redis");
 
-  const source = github("Mithridates01/onlysongs.io", { branch: "main" });
+  // Pushes to main deploy automatically once GitHub's checks pass (CI in
+  // .github/workflows/ci.yml), so a failing build never goes live.
+  const source = github("Mithridates01/onlysongs.io", { branch: "main", checkSuites: true });
   const build = { builder: "DOCKERFILE" as const };
   // Advisory-locked, so web and worker can both run it on the same deploy.
   const migrate = "node_modules/.bin/prisma migrate deploy";
@@ -29,6 +31,8 @@ export default defineRailway(() => {
       // Mail goes through Resend's HTTPS API: Railway's Hobby plan blocks outbound SMTP.
       RESEND_API_KEY: preserve(),
       MAIL_FROM: preserve(),
+      // Error tracking (src/lib/sentry.ts); off when unset.
+      SENTRY_DSN: preserve(),
     },
   });
 
@@ -50,6 +54,7 @@ export default defineRailway(() => {
       // on an https:// APP_URL without mail configured.
       RESEND_API_KEY: web.env.RESEND_API_KEY,
       MAIL_FROM: web.env.MAIL_FROM,
+      SENTRY_DSN: web.env.SENTRY_DSN,
     },
   });
 

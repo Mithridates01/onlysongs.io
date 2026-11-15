@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { createUser, sendVerification, sessionFor } from "@/lib/auth-actions";
+import { announceAccount, createUser, sendVerification, sessionFor } from "@/lib/auth-actions";
 import { json, parseJson, requestIp } from "@/lib/http";
 import { canSignUpDirectly } from "@/lib/early-access";
 import { MINUTE, rateLimit } from "@/lib/rate-limit";
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   try {
     const user = await createUser(email, password);
     await sendVerification(user);
+    announceAccount(user, { welcome: false });
     const token = await sessionFor(user, request);
     const response = json({ ok: true, next: "/onboarding" });
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());

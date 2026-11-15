@@ -13,6 +13,8 @@ async function main() {
   const { notifyUser } = await import("../lib/mail");
   const { assertMailConfigured } = await import("../lib/env");
   assertMailConfigured();
+  const { initSentry, flushSentry } = await import("../lib/sentry");
+  initSentry("worker");
   const { log } = await import("../lib/log");
 
   await reconcileSchedules();
@@ -55,7 +57,7 @@ async function main() {
   );
 
   worker.on("failed", (job, error) => {
-    log.error("check job failed", { jobId: job?.id, message: error.message });
+    log.error("check job failed", { jobId: job?.id, userId: job?.data?.userId, message: error.message });
   });
 
   log.info("worker started");
@@ -65,6 +67,7 @@ async function main() {
     clearInterval(prune);
     clearInterval(reconcile);
     await worker.close();
+    await flushSentry();
     process.exit(0);
   };
   process.on("SIGTERM", () => {

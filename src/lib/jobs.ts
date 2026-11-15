@@ -20,7 +20,7 @@ export function schedulerId(userId: string): string {
 }
 
 function everyMs(intervalSeconds: number): number {
-  return Math.max(10, intervalSeconds) * 1000;
+  return Math.max(5, intervalSeconds) * 1000;
 }
 
 export async function scheduleUser(userId: string, intervalSeconds: number): Promise<void> {
@@ -94,7 +94,7 @@ export async function trySchedule(userId: string, intervalSeconds: number, immed
     if (immediate) await enqueueCheck(userId);
     return null;
   } catch (error) {
-    log.error("schedule failed", { message: error instanceof Error ? error.message : "unknown" });
+    log.error("schedule failed", { userId, message: error instanceof Error ? error.message : "unknown" });
     return "Redis is not running, so automatic checks will not start.";
   }
 }
@@ -103,7 +103,7 @@ export async function tryUnschedule(userId: string): Promise<void> {
   try {
     await removeSchedule(userId);
   } catch (error) {
-    log.error("unschedule failed", { message: error instanceof Error ? error.message : "unknown" });
+    log.error("unschedule failed", { userId, message: error instanceof Error ? error.message : "unknown" });
   }
 }
 

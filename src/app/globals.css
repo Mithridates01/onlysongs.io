@@ -239,9 +239,27 @@ button.linkish { border: 0; background: none; padding: 0; color: var(--accent-te
 .sample-host { position: fixed; left: -10000px; top: 0; width: 300px; height: 80px; overflow: hidden; }
 input[type="search"]::-webkit-search-cancel-button { filter: invert(0.6); }
 
+/* Label/value pairs on the operator's account page. */
+.facts { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.facts div { display: flex; gap: 16px; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); padding-top: 10px; }
+.facts div:first-child { border-top: 0; padding-top: 0; }
+.facts dt { color: var(--muted); font-size: 14px; flex: none; }
+.facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+
 .list-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding: 14px 0; border-top: 1px solid var(--line); }
 
 .table-wrap { overflow-x: auto; }
+td .pill { white-space: nowrap; }
+
+/* ---- admin metrics ---- */
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 20px; }
+.metric { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.metric strong { font-family: var(--display); font-weight: 300; font-size: 36px; line-height: 1; letter-spacing: -0.03em; color: var(--text); }
+.metric strong.bad { color: var(--apricot-text); }
+.metric .help { font-size: 13px; }
+.bar { height: 8px; margin-top: 6px; border-radius: 999px; background: var(--ground); overflow: hidden; }
+.bar > div { height: 100%; border-radius: 999px; background: var(--accent); }
+.admin-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 20px; margin-top: 20px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 14px 16px; border-top: 1px solid var(--line); vertical-align: middle; }
 thead th { border-top: 0; padding-top: 0; font: 500 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
@@ -255,7 +273,7 @@ td { color: var(--body); }
 
 /* On wider screens, card buttons size to their label instead of filling the card. */
 @media (min-width: 801px) {
-  .card > .btn, .card form > .btn, .btn.save { align-self: flex-start; justify-self: start; min-width: 200px; }
+  .card > .btn, .card form > .btn { align-self: flex-start; justify-self: start; min-width: 200px; }
 }
 
 @media (max-width: 800px) {

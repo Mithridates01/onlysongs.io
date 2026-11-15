@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { EarlyAccessStats } from "@/lib/admin-metrics";
 import { LocalTime } from "./LocalTime";
 
 export type RequestRow = {
@@ -19,7 +20,16 @@ const LABEL: Record<RequestRow["status"], string> = {
 };
 
 // Operator list of early-access requests with approve, decline and resend.
-export function EarlyAccessRequests({ initial }: { initial: RequestRow[] }) {
+function waitedFor(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  return days < 1 ? "today" : days === 1 ? "1 day" : `${days} days`;
+}
+
+function hours(value: number): string {
+  return value < 48 ? `${value} h` : `${Math.round(value / 24)} days`;
+}
+
+export function EarlyAccessRequests({ initial, stats }: { initial: RequestRow[]; stats: EarlyAccessStats }) {
   const [rows, setRows] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -54,6 +64,23 @@ export function EarlyAccessRequests({ initial }: { initial: RequestRow[] }) {
         </div>
         <span className="help">{waiting} waiting</span>
       </div>
+      <div className="metric-grid">
+        <div className="metric">
+          <span className="label">Longest wait</span>
+          <strong>{stats.oldestWaitDays === null ? "—" : `${stats.oldestWaitDays} d`}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">Typical time to approve</span>
+          <strong>{stats.medianApproveHours === null ? "—" : hours(stats.medianApproveHours)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">Invites that joined</span>
+          <strong>
+            {stats.joined} of {stats.invited}
+          </strong>
+          <span className="help">{stats.expired} expired unused</span>
+        </div>
+      </div>
       {error ? <p className="banner bad">{error}</p> : null}
       {rows.length === 0 ? (
         <p className="help">No requests yet.</p>
@@ -65,11 +92,16 @@ export function EarlyAccessRequests({ initial }: { initial: RequestRow[] }) {
                 <span style={{ fontSize: 15 }}>{row.email}</span>
                 <span className="mono" style={{ color: "var(--muted)", fontSize: 12 }}>
                   Requested <LocalTime iso={row.createdAt} />
+                  {row.status === "pending" ? <> · waiting {waitedFor(row.createdAt)}</> : null}
                   {row.status === "invited" && row.inviteExpiresAt ? (
-                    <>
-                      {" "}
-                      · invite expires <LocalTime iso={row.inviteExpiresAt} />
-                    </>
+                    expired(row) ? (
+                      <> · invite expired unused</>
+                    ) : (
+                      <>
+                        {" "}
+                        · invite expires <LocalTime iso={row.inviteExpiresAt} />
+                      </>
+                    )
                   ) : null}
                 </span>
               </div>
@@ -85,7 +117,9 @@ export function EarlyAccessRequests({ initial }: { initial: RequestRow[] }) {
                   </>
                 ) : (
                   <>
-                    <span className={row.status === "declined" ? "pill" : "pill good"}>{LABEL[row.status]}</span>
+                    <span className={row.status === "declined" || expired(row) ? "pill" : "pill good"}>
+                      {expired(row) ? "Invite expired" : LABEL[row.status]}
+                    </span>
                     {row.status === "invited" || row.status === "declined" ? (
                       <button type="button" className="btn secondary sm" disabled={busy === row.id} onClick={() => decide(row, "approve")}>
                         {row.status === "invited" ? "Resend" : "Approve"}
@@ -100,4 +134,8 @@ export function EarlyAccessRequests({ initial }: { initial: RequestRow[] }) {
       )}
     </section>
   );
+}
+
+function expired(row: RequestRow): boolean {
+  return row.status === "invited" && Boolean(row.inviteExpiresAt) && new Date(row.inviteExpiresAt!).getTime() <= Date.now();
 }

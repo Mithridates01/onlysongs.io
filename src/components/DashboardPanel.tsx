@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { outcomeLabel } from "@/lib/outcomes";
+import { switchBlockedReason } from "@/lib/switch-reason";
 import type { StatusResponse } from "@/lib/types";
 import { LocalTime } from "./LocalTime";
 import { ReplacementPicker } from "./ReplacementPicker";
@@ -73,6 +74,7 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
           ? `If a podcast or audiobook starts, your song comes back within about ${status.intervalSeconds < 90 ? "a minute" : `${Math.round(status.intervalSeconds / 60)} minutes`}.`
           : "Turn the blocker on when you want to stay in the music.";
   const listening = on && readySpotify && readySong && !status.quietHoursActive;
+  const blockedReason = switchBlockedReason(status.connection, readySong, status.redirectUri);
 
   return (
     <>
@@ -138,6 +140,11 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
               </Link>
             ) : null}
           </div>
+          {blockedReason ? (
+            <p className="help" style={{ margin: 0 }}>
+              {blockedReason}
+            </p>
+          ) : null}
           <p className="row mono" style={{ gap: "6px 18px", color: "var(--muted)", margin: 0 }}>
             <span>Every {status.intervalSeconds}s</span>
             <span>

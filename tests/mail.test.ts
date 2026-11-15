@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertMailConfigured } from "../src/lib/env";
-import { sendEmail } from "../src/lib/mail";
+import { sendEmail, sendQuietly } from "../src/lib/mail";
 
 const KEYS = ["RESEND_API_KEY", "SMTP_HOST", "MAIL_FROM", "SMTP_FROM", "SMTP_USER", "APP_URL"] as const;
 const saved: Record<string, string | undefined> = {};
@@ -53,5 +53,12 @@ describe("mail", () => {
     expect(() => assertMailConfigured()).toThrow(/RESEND_API_KEY/);
     process.env.RESEND_API_KEY = "re_test_key";
     expect(() => assertMailConfigured()).not.toThrow();
+  });
+
+  it("never throws from a send nobody waits on", async () => {
+    process.env.RESEND_API_KEY = "re_test_key";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("domain not verified", { status: 403 })));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(sendQuietly("me@example.com", { subject: "Hi", text: "Body" })).resolves.toBeUndefined();
   });
 });

@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { appUrl } from "./env";
 import { log } from "./log";
+import { recordEmail } from "./mail-stats";
 
 export type Email = { subject: string; text: string };
 
@@ -20,7 +21,7 @@ function sender(): string {
 export async function sendEmail(to: string, email: Email): Promise<void> {
   const resendKey = process.env.RESEND_API_KEY?.trim();
   if (resendKey) {
-    await sendWithResend(resendKey, to, email);
+    await counted(sendWithResend(resendKey, to, email));
     log.info("email sent", { via: "resend", subject: email.subject });
     return;
   }
@@ -39,8 +40,30 @@ export async function sendEmail(to: string, email: Email): Promise<void> {
     socketTimeout: 15_000,
     auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || "" } : undefined,
   });
-  await transporter.sendMail({ from: sender(), to, subject: email.subject, text: email.text });
+  await counted(transporter.sendMail({ from: sender(), to, subject: email.subject, text: email.text }));
   log.info("email sent", { via: "smtp", subject: email.subject });
+}
+
+// Tallies each real send for the admin page, then passes the outcome through.
+async function counted<T>(sending: Promise<T>): Promise<T> {
+  try {
+    const result = await sending;
+    await recordEmail(true);
+    return result;
+  } catch (error) {
+    await recordEmail(false);
+    throw error;
+  }
+}
+
+// For emails nobody waits on (confirmations, operator notices): a failure is
+// logged and never undoes what triggered it.
+export async function sendQuietly(to: string, email: Email, context: Record<string, unknown> = {}): Promise<void> {
+  try {
+    await sendEmail(to, email);
+  } catch (error) {
+    log.error("email failed", { ...context, subject: email.subject, message: error instanceof Error ? error.message : "unknown" });
+  }
 }
 
 async function sendWithResend(apiKey: string, to: string, email: Email): Promise<void> {
@@ -87,6 +110,34 @@ export function resetEmail(link: string): Email {
   return {
     subject: "Reset your password — OnlySongs",
     text: `Choose a new OnlySongs password:\n\n${link}\n\nThe link works once and expires in 1 hour. If you did not ask for this, ignore this email; your password stays the same.`,
+  };
+}
+
+export function requestReceivedEmail(): Email {
+  return {
+    subject: "You’re on the list — OnlySongs",
+    text: `Thanks for asking for early access to OnlySongs.\n\nWe let people in a few at a time. When it’s your turn you’ll get an email with a link to finish creating your account.\n\nIf you didn’t ask for this, ignore this email.`,
+  };
+}
+
+export function welcomeEmail(): Email {
+  return {
+    subject: "Welcome to OnlySongs",
+    text: `Your OnlySongs account is ready.\n\nNext, connect Spotify and pick a song. It takes about five minutes:\n\n${appUrl()}/onboarding\n\nAfter that, podcasts that start on your Spotify get swapped for your song.`,
+  };
+}
+
+export function operatorRequestEmail(email: string): Email {
+  return {
+    subject: `New early access request: ${email}`,
+    text: `${email} asked for early access.\n\nApprove or decline: ${appUrl()}/admin#requests`,
+  };
+}
+
+export function operatorAccountEmail(email: string): Email {
+  return {
+    subject: `New account: ${email}`,
+    text: `${email} just created an OnlySongs account.\n\nSee them: ${appUrl()}/admin`,
   };
 }
 

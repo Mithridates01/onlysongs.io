@@ -36,6 +36,7 @@ export async function persistTokens(
 }
 
 export async function markConnectionBroken(userId: string, email: string): Promise<void> {
+  log.info("spotify connection broken", { userId });
   await prisma.$transaction([
     prisma.spotifyConnection.update({
       where: { userId },
