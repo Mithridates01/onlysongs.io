@@ -132,11 +132,25 @@ describe("early access", () => {
     expect(response.status).toBe(404);
     expect(outbox).toHaveLength(0);
   });
+
+  it("gives no operator rights to an admin email that isn't verified", async () => {
+    const email = uniqueEmail();
+    await requestAccess(post("/api/early-access", { email }));
+    const request = await prisma.earlyAccessRequest.findUniqueOrThrow({ where: { email } });
+    await signInAsAdmin({ verified: false });
+    const response = await decide(post(`/api/admin/early-access/${request.id}`, { action: "approve" }), params(request.id));
+    expect(response.status).toBe(404);
+    expect(outbox).toHaveLength(0);
+    expect((await prisma.earlyAccessRequest.findUniqueOrThrow({ where: { email } })).status).toBe("pending");
+  });
 });
 
-async function signInAsAdmin(): Promise<void> {
+async function signInAsAdmin(opts?: { verified?: boolean }): Promise<void> {
   const admin = await seedListener({ email: uniqueEmail() });
-  await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true } });
+  await prisma.user.update({
+    where: { id: admin.id },
+    data: { isAdmin: true, emailVerifiedAt: opts?.verified === false ? null : new Date() },
+  });
   sessionJar.token = await startSession({ id: admin.id, email: admin.email, isAdmin: true });
 }
 

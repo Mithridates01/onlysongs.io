@@ -1,12 +1,15 @@
 import { authorizedCall } from "@/lib/accounts";
 import { prisma } from "@/lib/db";
 import { json, requireUser } from "@/lib/http";
+import { MINUTE, rateLimit } from "@/lib/rate-limit";
 import { resolveCatalogItem } from "@/lib/spotify";
 import { parseSpotifyUri } from "@/lib/spotify-uri";
 
 export async function POST(request: Request) {
   const user = await requireUser();
   if (!user) return json({ error: "Sign in required." }, 401);
+  const limit = await rateLimit({ key: `resolve:${user.id}`, limit: 20, windowMs: MINUTE });
+  if (!limit.ok) return json({ error: "Too many lookups. Wait a moment." }, 429);
 
   let body: { input?: unknown; purpose?: unknown } | null = null;
   try {

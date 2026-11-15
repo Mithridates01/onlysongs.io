@@ -4,6 +4,7 @@ import { EarlyAccessRequests } from "@/components/EarlyAccessRequests";
 import { loadSeries } from "@/lib/admin-stats";
 import { EndSessionsButton } from "@/components/EndSessionsButton";
 import { LocalTime } from "@/components/LocalTime";
+import { isOperator } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { currentSession } from "@/lib/http";
 import { readWorkerHeart } from "@/lib/redis";
@@ -12,7 +13,7 @@ export default async function AdminPage() {
   const session = await currentSession();
   if (!session) return null;
   const me = await prisma.user.findUnique({ where: { id: session.sub } });
-  if (!me?.isAdmin) notFound();
+  if (!isOperator(me)) notFound();
 
   const [users, counts, worker, requests, series] = await Promise.all([
     prisma.user.findMany({

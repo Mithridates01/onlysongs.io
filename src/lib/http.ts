@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { z } from "zod";
+import { isOperator } from "./admin";
 import { prisma } from "./db";
 import { clientIp } from "./rate-limit";
 import { SESSION_COOKIE, type SessionPayload } from "./session";
@@ -36,6 +37,12 @@ export async function requireUser() {
   const session = await currentSession();
   if (!session) return null;
   return prisma.user.findUnique({ where: { id: session.sub } });
+}
+
+// The signed-in operator, or null for everyone else (see isOperator).
+export async function requireOperator() {
+  const user = await requireUser();
+  return isOperator(user) ? user : null;
 }
 
 export function requestIp(request: Request): string {

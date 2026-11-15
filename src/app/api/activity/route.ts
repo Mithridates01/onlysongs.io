@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { toCsv } from "@/lib/csv";
 import { json, requireUser } from "@/lib/http";
 
 const WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
@@ -22,7 +23,19 @@ export async function GET(request: Request) {
       orderBy: { at: "desc" },
       take: 5000,
     });
-    return new Response(toCsv(rows), {
+    const csv = toCsv(
+      ["at", "show_name", "episode_name", "device_name", "action", "result", "http_status"],
+      rows.map((row) => [
+        row.at.toISOString(),
+        row.showName,
+        row.episodeName,
+        row.deviceName,
+        row.action,
+        row.result,
+        row.httpStatus?.toString() ?? "",
+      ]),
+    );
+    return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": 'attachment; filename="onlysongs-activity.csv"',
@@ -49,38 +62,4 @@ export async function GET(request: Request) {
     })),
     nextBefore: rows.length === 50 ? rows[rows.length - 1]?.at.toISOString() ?? null : null,
   });
-}
-
-function toCsv(
-  rows: {
-    at: Date;
-    showName: string | null;
-    episodeName: string | null;
-    deviceName: string | null;
-    action: string;
-    result: string;
-    httpStatus: number | null;
-  }[],
-): string {
-  const header = ["at", "show_name", "episode_name", "device_name", "action", "result", "http_status"];
-  const lines = rows.map((row) =>
-    [
-      row.at.toISOString(),
-      row.showName,
-      row.episodeName,
-      row.deviceName,
-      row.action,
-      row.result,
-      row.httpStatus?.toString() ?? "",
-    ]
-      .map(csvCell)
-      .join(","),
-  );
-  return [header.join(","), ...lines].join("\n");
-}
-
-function csvCell(value: string | null): string {
-  const text = value ?? "";
-  if (/[",\n]/.test(text)) return `"${text.replaceAll('"', '""')}"`;
-  return text;
 }

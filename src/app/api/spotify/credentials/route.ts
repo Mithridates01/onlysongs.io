@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const limit = await rateLimit({ key: `creds:${user.id}:${requestIp(request)}`, limit: 10, windowMs: 15 * MINUTE });
   if (!limit.ok) return json({ error: "Too many credential updates. Wait a few minutes." }, 429);
 
-  const body = await parseJson(request, spotifyCredentials, "Paste the Client ID and Client Secret from the Spotify dashboard.");
+  const body = await parseJson(request, spotifyCredentials);
   if (!body.ok) return body.response;
   const { clientId, clientSecret } = body.data;
 

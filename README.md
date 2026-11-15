@@ -50,7 +50,7 @@ npm run worker
 
 7. Pick a replacement, turn the blocker on, and play a podcast. **Check now** runs one check immediately. The worker does the rest. The dashboard warns you if the worker is not running.
 
-Set `ADMIN_EMAIL` in `.env` before that person signs up if you want the operator page.
+Set `ADMIN_EMAIL` in `.env` if you want the operator page. It appears once that account confirms its email.
 
 If Docker Desktop stops, every page fails until Postgres and Redis are back. Run step 1 again; the app reconnects on its own.
 
@@ -66,7 +66,7 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `ENCRYPTION_KEY` | Yes | 32 bytes as 64 hex characters. The root key: HKDF derives separate keys from it for Spotify secrets at rest and for session cookies. |
 | `ENCRYPTION_KEY_PREVIOUS` | Rotation only | The old root key while rotating. Values under it still decrypt; `npm run reencrypt -- --apply` rewrites them under the new key. Rotating also signs everyone out. |
 | `SESSION_SECRET` | No | At least 32 characters. Signs session cookies instead of the key derived from `ENCRYPTION_KEY`. |
-| `ADMIN_EMAIL` | No | This address becomes the operator on sign-up or login, and can always sign up. |
+| `ADMIN_EMAIL` | No | This address becomes the operator once its email is verified, and can always sign up. |
 | `SIGNUPS` | No | `invite` (default): sign-up only through an approved early-access invite. `open`: anyone can create an account. |
 | `APP_DOMAIN` | Self-hosted only | Hostname only, such as `onlysongs.io`. Caddy requests a certificate for it. |
 | `RESEND_API_KEY` | Production (or SMTP) | Sends email through [Resend](https://resend.com)'s HTTPS API, which works on Railway's Hobby plan where outbound SMTP is blocked. Takes priority over SMTP when set. |
@@ -215,7 +215,9 @@ Keep that file somewhere other than the server. Restoring is `psql` into an empt
 - Each sign-in is a row in `sessions`, so logging out, "Sign out other devices", the operator's "End sessions", and a password reset all end sessions on the server.
 - Verification and reset links are single use, expire (24 hours and 1 hour), and are stored only as SHA-256 hashes.
 - Sign-in, signup, password reset, and credential changes are rate limited in Redis per account and per IP. The IP comes from the first `X-Forwarded-For` entry, so the proxy in front must set that header.
-- Responses carry a CSP, `X-Frame-Options: DENY`, `Referrer-Policy`, and HSTS. The CSP allows Spotify's embed player and its iFrame API (`open.spotify.com`, `embed-cdn.spotifycdn.com`), which play search-result samples. Connecting Spotify is a POST.
+- Responses carry a CSP, `X-Frame-Options: DENY`, `Referrer-Policy`, and HSTS. Middleware builds the CSP per request (`src/lib/csp.ts`): scripts run only with that request's nonce (`'strict-dynamic'`, no `'unsafe-inline'` or `'unsafe-eval'`), so every page renders per request. Search samples play in Spotify's embed iframe (`frame-src https://open.spotify.com`), driven by `postMessage`; no Spotify script runs on the site. Connecting Spotify is a POST.
+- Operator rights need `ADMIN_EMAIL` and a verified email, so nobody can claim the operator account by signing up with that address first.
+- Sign-in costs the same bcrypt time whether or not the email has an account. Manual checks, Spotify search and link lookups are rate-limited per user. The activity CSV prefixes formula-like cells with `'`.
 - The production database password in `docker-compose.yml` is for the private Docker network. Do not publish port 5432.
 - Keep `.env` on the server only. It is listed in `.gitignore`.
 - Development Mode is for personal, non-commercial use. Charging for this would need Spotify's extended quota approval.
