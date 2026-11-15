@@ -20,9 +20,17 @@ export async function createUser(email: string, password: string, opts?: { verif
   });
 }
 
+// Compared against when the email has no account, so a miss costs the same
+// bcrypt time as a wrong password and response time doesn't reveal accounts.
+let dummyHash: Promise<string> | null = null;
+
 export async function verifyLogin(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
+  if (!user) {
+    dummyHash ??= bcrypt.hash("onlysongs-timing-equalizer", 12);
+    await bcrypt.compare(password, await dummyHash);
+    return null;
+  }
   const match = await bcrypt.compare(password, user.passwordHash);
   if (!match) return null;
   if (adminEmail() === email && !user.isAdmin) {

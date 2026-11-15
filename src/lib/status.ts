@@ -1,3 +1,4 @@
+import { isOperator } from "./admin";
 import { FAILURE_WARN_AT } from "./blocker-logic";
 import { last4 } from "./crypto";
 import { prisma } from "./db";
@@ -97,7 +98,7 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
     warnings,
     redirectUri: redirectUri(),
     email: user.email,
-    isAdmin: user.isAdmin,
+    isAdmin: isOperator(user),
   };
 }
 

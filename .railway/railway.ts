@@ -36,7 +36,8 @@ export default defineRailway(() => {
     source,
     build,
     preDeploy: migrate,
-    replicas: 2,
+    // One worker keeps the bill minimal; Railway restarts it if it crashes.
+    replicas: 1,
     deploy: { restartPolicyType: "ALWAYS" },
     env: {
       PROCESS: "worker",

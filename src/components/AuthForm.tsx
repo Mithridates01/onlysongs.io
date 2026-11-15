@@ -4,7 +4,14 @@ import Link from "next/link";
 import { Brand } from "./Brand";
 import { useState } from "react";
 
-export function AuthForm({ mode, inviteOnly = false }: { mode: "login" | "signup"; inviteOnly?: boolean }) {
+type Props = {
+  mode: "login" | "signup";
+  inviteOnly?: boolean;
+  // A same-site page the sign-in interrupted, already checked by safeNextPath.
+  returnTo?: string | null;
+};
+
+export function AuthForm({ mode, inviteOnly = false, returnTo = null }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,7 +34,8 @@ export function AuthForm({ mode, inviteOnly = false }: { mode: "login" | "signup
       setPending(false);
       return;
     }
-    window.location.href = data.next;
+    // Setup steps (onboarding) win over the page the visitor came from.
+    window.location.href = data.next === "/dashboard" && returnTo ? returnTo : data.next;
   }
 
   return (
