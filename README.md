@@ -119,7 +119,7 @@ Production is set up for Railway, but nothing is deployed yet. A self-hosted VM 
 
 ### Railway
 
-`.railway/railway.ts` defines the project: Postgres, Redis, and the `web` and `worker` services, both built from this repo's `Dockerfile` on `main`. Railway terminates HTTPS, and the services reach Postgres and Redis over Railway's private network. Each deploy runs `prisma migrate deploy` once as a pre-deploy command. Web is health-checked on `/api/health`. The worker runs 2 replicas.
+`.railway/railway.ts` defines the project: Postgres, Redis, and the `web` and `worker` services, both built from this repo's `Dockerfile` on `main`. Railway terminates HTTPS, and the services reach Postgres and Redis over Railway's private network. Each deploy runs `prisma migrate deploy` once as a pre-deploy command. Web is health-checked on `/api/health`. Its custom domain, `onlysongs.io`, is added with `railway domain` (Railway configuration can't register custom domains). The worker runs 1 replica to keep the bill minimal; Railway restarts it if it crashes.
 
 ```bash
 brew install railway
