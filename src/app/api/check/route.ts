@@ -15,7 +15,7 @@ export async function POST() {
     const status = await buildStatus(user.id);
     return json({ ...summary, status });
   } catch (error) {
-    log.error("manual check failed", { message: error instanceof Error ? error.message : "unknown" });
+    log.error("manual check failed", { userId: user.id, message: error instanceof Error ? error.message : "unknown" });
     return json({ outcome: "error", detail: "The check could not run. Confirm Redis and Postgres are up." }, 503);
   }
 }

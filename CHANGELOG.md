@@ -4,6 +4,13 @@ Changes waiting to be released, newest first. Move a section under a version hea
 
 ## Unreleased
 
+### Support tools (branch `support-tools`)
+
+- **Account page for the operator.** Admin → click an email. It shows the account's setup and recent checks, and a "What's going on" list that explains what's stopping it in plain language.
+- **Logs name the account.** Setup steps and failures are logged with the internal user id (never the email), including why a Spotify sign-in failed.
+- **Sentry error tracking** for the web server and worker (`SENTRY_DSN`). Errors only, no performance tracing, and no cookies, headers or request bodies. Handled errors logged with `log.error` are sent too.
+- **Read-only support login.** `scripts/support-readonly.sql` creates `support_ro`, which can read secret-free views only.
+
 ### Settings save on their own; the dashboard says why the switch is off (branch `settings-autosave`)
 
 - **Settings autosave.** Polling, blocking, time zone, quiet hours and the allow list now save about half a second after each change, with a "Saving… / All changes saved." line. The Save button is gone. Before, these only saved from a button at the bottom, so leaving the page dropped changes without a word. Leaving mid-edit still sends the change.

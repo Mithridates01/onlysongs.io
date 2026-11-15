@@ -13,7 +13,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
-  serverExternalPackages: ["bullmq", "ioredis"],
+  serverExternalPackages: ["bullmq", "ioredis", "@sentry/node"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

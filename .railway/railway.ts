@@ -29,6 +29,8 @@ export default defineRailway(() => {
       // Mail goes through Resend's HTTPS API: Railway's Hobby plan blocks outbound SMTP.
       RESEND_API_KEY: preserve(),
       MAIL_FROM: preserve(),
+      // Error tracking (src/lib/sentry.ts); off when unset.
+      SENTRY_DSN: preserve(),
     },
   });
 
@@ -50,6 +52,7 @@ export default defineRailway(() => {
       // on an https:// APP_URL without mail configured.
       RESEND_API_KEY: web.env.RESEND_API_KEY,
       MAIL_FROM: web.env.MAIL_FROM,
+      SENTRY_DSN: web.env.SENTRY_DSN,
     },
   });
 

@@ -239,6 +239,13 @@ button.linkish { border: 0; background: none; padding: 0; color: var(--accent-te
 .sample-host { position: fixed; left: -10000px; top: 0; width: 300px; height: 80px; overflow: hidden; }
 input[type="search"]::-webkit-search-cancel-button { filter: invert(0.6); }
 
+/* Label/value pairs on the operator's account page. */
+.facts { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.facts div { display: flex; gap: 16px; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); padding-top: 10px; }
+.facts div:first-child { border-top: 0; padding-top: 0; }
+.facts dt { color: var(--muted); font-size: 14px; flex: none; }
+.facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+
 .list-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding: 14px 0; border-top: 1px solid var(--line); }
 
 .table-wrap { overflow-x: auto; }

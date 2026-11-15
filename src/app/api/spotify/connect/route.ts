@@ -3,6 +3,7 @@ import { encryptString } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 import { redirectUri } from "@/lib/env";
 import { json, requireUser } from "@/lib/http";
+import { log } from "@/lib/log";
 import { codeChallenge, createOauthState, createVerifier } from "@/lib/pkce";
 import { PLAYBACK_SCOPES } from "@/lib/spotify";
 
@@ -34,5 +35,6 @@ export async function POST() {
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("code_challenge", codeChallenge(verifier));
+  log.info("spotify sign-in started", { userId: user.id, redirectUri: redirectUri() });
   return NextResponse.redirect(url, 303);
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminCharts } from "@/components/AdminCharts";
 import { EarlyAccessRequests } from "@/components/EarlyAccessRequests";
@@ -72,7 +73,7 @@ export default async function AdminPage() {
             {users.map((user) => (
               <tr key={user.id}>
                 <td>
-                  {user.email}
+                  <Link href={`/admin/users/${user.id}`}>{user.email}</Link>
                   {user.isAdmin ? <span className="muted"> · admin</span> : null}
                 </td>
                 <td>{user.spotify?.status ?? "none"}</td>
