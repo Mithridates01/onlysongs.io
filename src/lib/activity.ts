@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { HISTORY_KEEP_DAYS } from "./listening";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -12,11 +13,12 @@ export async function pruneOldActivity(now = new Date()): Promise<number> {
 // links are kept a week for troubleshooting; active-day rows about 13 months.
 export async function pruneStale(now = new Date()): Promise<Record<string, number>> {
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
-  const [activity, sessions, tokens, days] = await Promise.all([
+  const [activity, sessions, tokens, days, listening] = await Promise.all([
     pruneOldActivity(now),
     prisma.session.deleteMany({ where: { OR: [{ expiresAt: { lt: weekAgo } }, { revokedAt: { lt: weekAgo } }] } }),
     prisma.authToken.deleteMany({ where: { OR: [{ usedAt: { lt: weekAgo } }, { expiresAt: { lt: weekAgo } }] } }),
     prisma.userActivityDay.deleteMany({ where: { day: { lt: new Date(now.getTime() - 400 * DAY_MS) } } }),
+    prisma.listeningEvent.deleteMany({ where: { at: { lt: new Date(now.getTime() - HISTORY_KEEP_DAYS * DAY_MS) } } }),
   ]);
-  return { activity, sessions: sessions.count, authTokens: tokens.count, activeDays: days.count };
+  return { activity, sessions: sessions.count, authTokens: tokens.count, activeDays: days.count, listening: listening.count };
 }

@@ -14,6 +14,7 @@ import {
 } from "./check-plan";
 import { prisma } from "./db";
 import { enqueueNotify } from "./jobs";
+import { recordListening } from "./listening";
 import { log } from "./log";
 import { withUserLock } from "./redis";
 import { readAllowedShows } from "./shows";
@@ -58,6 +59,13 @@ async function runUnlocked(userId: string, opts?: CheckOptions): Promise<CheckSu
   if (gate.kind === "stop") return persist(userId, bundle.email, gate.result);
 
   const observed = await readPlayer(bundle.spotify as SpotifyConnection, signal);
+  if (observed.kind === "player" && observed.playback.ok) {
+    const body = observed.playback.status === 200 ? observed.playback.body : null;
+    // History is a side record; a failure here never affects blocking.
+    await recordListening({ id: userId, historyEnabled: bundle.historyEnabled, timeZone: bundle.settings.timeZone }, body, now).catch(
+      (error: unknown) => log.error("listening history write failed", { userId, message: error instanceof Error ? error.message : "unknown" }),
+    );
+  }
   const plan = decide(observed, state, now);
   if (gate.kind === "observe") return persist(userId, bundle.email, observeOnly(plan));
   if (!("kind" in plan)) return persist(userId, bundle.email, plan);
