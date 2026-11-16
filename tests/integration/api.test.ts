@@ -119,10 +119,14 @@ describe("auth and settings routes", () => {
     const schedulers = await getQueue().getJobSchedulers();
     expect(schedulers.some((job) => (job.id ?? job.key) === schedulerId(user.id))).toBe(true);
 
+    // Turning off waits an hour, so the schedule stays until then.
     const disabled = await putSettings(jsonRequest("PUT", { enabled: false }));
     expect(disabled.status).toBe(200);
+    const waiting = await prisma.blockerSettings.findUniqueOrThrow({ where: { userId: user.id } });
+    expect(waiting.enabled).toBe(true);
+    expect(waiting.offAt).not.toBeNull();
     const after = await getQueue().getJobSchedulers();
-    expect(after.some((job) => (job.id ?? job.key) === schedulerId(user.id))).toBe(false);
+    expect(after.some((job) => (job.id ?? job.key) === schedulerId(user.id))).toBe(true);
   });
 
   it("starts Spotify sign-in only with a POST", async () => {

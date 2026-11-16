@@ -25,8 +25,8 @@ describe("settingsPatch", () => {
     expect(error({ intervalSeconds: 4 })).toBe("Poll interval must be between 5 and 300 seconds.");
     expect(error({ intervalSeconds: 12.5 })).toBe("Poll interval must be between 5 and 300 seconds.");
     expect(error({ timeZone: "Mars/Olympus" })).toBe("That time zone is not recognized.");
-    expect(error({ quietHours: { start: "25:00", end: "07:00" } })).toBe("Quiet hours use 24-hour times like 06:00.");
-    expect(error({ quietHours: { start: "06:00", end: "06:00:00" } })).toBe("Quiet hours need a start and end that differ.");
+    expect(error({ quietHours: { start: "25:00", end: "07:00" } })).toBe("Allowed hours use 24-hour times like 06:00.");
+    expect(error({ quietHours: { start: "06:00", end: "06:00:00" } })).toBe("Allowed hours need a start and end that differ.");
     expect(error({ replacement: { uri: "spotify:album:abc123", label: "X", kind: "track" } })).toBe(
       "The replacement type does not match its Spotify link.",
     );

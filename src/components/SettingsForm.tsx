@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { AllowedShowView, SearchHitView, StatusResponse } from "@/lib/types";
 import { useSpotifySearch } from "./useSpotifySearch";
@@ -32,9 +33,6 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
   const [podcasts, setPodcasts] = useState(initial.blockPodcasts);
   const [audiobooks, setAudiobooks] = useState(initial.blockAudiobooks);
   const [timeZone, setTimeZone] = useState(initial.timeZone);
-  const [quietOn, setQuietOn] = useState(Boolean(initial.quietHours));
-  const [start, setStart] = useState(initial.quietHours?.start ?? "06:00");
-  const [end, setEnd] = useState(initial.quietHours?.end ?? "08:00");
   const [shows, setShows] = useState<AllowedShowView[]>(initial.allowedShows);
   const [query, setQuery] = useState("");
   const [paste, setPaste] = useState("");
@@ -48,7 +46,6 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
     blockPodcasts: podcasts,
     blockAudiobooks: audiobooks,
     timeZone,
-    quietHours: quietOn ? { start, end } : null,
     allowedShows: shows,
   });
   const savedBody = useRef(body);
@@ -177,7 +174,7 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
               Block audiobooks
             </label>
             <label className="field">
-              <span>Time zone for quiet hours and “today”</span>
+              <span>Time zone for allowed hours and “today”</span>
               <select value={timeZone} onChange={(event) => setTimeZone(event.target.value)}>
                 {zones.map((zone) => (
                   <option key={zone} value={zone}>
@@ -188,22 +185,11 @@ export function SettingsForm({ initial }: { initial: StatusResponse }) {
             </label>
           </section>
           <section className="card">
-            <h2>Quiet hours</h2>
-            <label className="row">
-              <input type="checkbox" checked={quietOn} onChange={(event) => setQuietOn(event.target.checked)} />
-              Allow podcasts and audiobooks during a daily window
-            </label>
-            <div className="row" style={{ marginTop: 12 }}>
-              <label className="field">
-                <span>From</span>
-                <input type="time" value={start} disabled={!quietOn} onChange={(event) => setStart(event.target.value)} />
-              </label>
-              <label className="field">
-                <span>Until</span>
-                <input type="time" value={end} disabled={!quietOn} onChange={(event) => setEnd(event.target.value)} />
-              </label>
-            </div>
-            <p className="help">Example: 06:00 to 08:00 lets a morning show play. Outside that window, the blocker resumes.</p>
+            <h2>Allowed hours</h2>
+            <p className="help">
+              Set the daily window when podcasts can play on the <Link href="/dashboard">dashboard</Link>. While the blocker is on, more
+              allowed time and turning the blocker off both wait an hour.
+            </p>
           </section>
         </div>
         <section className="card">

@@ -4,6 +4,12 @@ Changes waiting to be released, newest first. Move a section under a version hea
 
 ## Unreleased
 
+### Allowed hours and unlock delay (branch `unlock-delay`)
+
+- Allowed hours (formerly quiet hours) moved to the dashboard: a 24-hour bar shows the window, now, and any change waiting.
+- While the blocker is on, turning it off and widening allowed hours wait one hour; "Keep it on" or "Cancel" undoes them. Narrowing applies at once.
+- Waiting changes apply on the next check, status load or save (`settlePending`), with no timer.
+
 ### Listening history (branch `listening-history`)
 
 - **History from checks already being made.** When the worker reads someone's player, a row is saved only if what's playing changed. A song across many checks is one row, and X → Y → X is three. Stopping or pausing counts as a change. No extra Spotify calls.

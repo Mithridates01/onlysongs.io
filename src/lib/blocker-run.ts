@@ -17,6 +17,7 @@ import { enqueueNotify } from "./jobs";
 import { recordListening } from "./listening";
 import { log } from "./log";
 import { withUserLock } from "./redis";
+import { settlePending } from "./settings";
 import { readAllowedShows } from "./shows";
 import { getPlayback, getTrack, playOnDevice, skipNext } from "./spotify";
 
@@ -44,10 +45,11 @@ async function runUnlocked(userId: string, opts?: CheckOptions): Promise<CheckSu
   });
   if (!bundle?.settings || !bundle.poll) return { outcome: "missing" };
   const now = new Date();
+  const settings = await settlePending(bundle.settings, now);
   const state: CheckState = {
     settings: {
-      ...bundle.settings,
-      allowedShowIds: readAllowedShows(bundle.settings.allowedShowIds).map((show) => show.id),
+      ...settings,
+      allowedShowIds: readAllowedShows(settings.allowedShowIds).map((show) => show.id),
     },
     poll: bundle.poll,
     connection: bundle.spotify
@@ -62,7 +64,7 @@ async function runUnlocked(userId: string, opts?: CheckOptions): Promise<CheckSu
   if (observed.kind === "player" && observed.playback.ok) {
     const body = observed.playback.status === 200 ? observed.playback.body : null;
     // History is a side record; a failure here never affects blocking.
-    await recordListening({ id: userId, historyEnabled: bundle.historyEnabled, timeZone: bundle.settings.timeZone }, body, now).catch(
+    await recordListening({ id: userId, historyEnabled: bundle.historyEnabled, timeZone: settings.timeZone }, body, now).catch(
       (error: unknown) => log.error("listening history write failed", { userId, message: error instanceof Error ? error.message : "unknown" }),
     );
   }

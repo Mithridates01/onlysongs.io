@@ -47,19 +47,24 @@ model SpotifyConnection {
 }
 
 model BlockerSettings {
-  userId           String           @id @map("user_id")
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  enabled          Boolean          @default(false)
-  intervalSeconds  Int              @default(5) @map("interval_seconds")
-  replacementUri   String?          @map("replacement_uri")
-  replacementLabel String?          @map("replacement_label")
-  replacementArt   String?          @map("replacement_art")
-  replacementKind  ReplacementKind? @map("replacement_kind")
-  blockPodcasts    Boolean          @default(true) @map("block_podcasts")
-  blockAudiobooks  Boolean          @default(true) @map("block_audiobooks")
-  quietHours       Json?            @map("quiet_hours")
-  allowedShowIds   Json             @default("[]") @map("allowed_show_ids")
-  timeZone         String           @default("UTC") @map("time_zone")
+  userId            String           @id @map("user_id")
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled           Boolean          @default(false)
+  intervalSeconds   Int              @default(5) @map("interval_seconds")
+  replacementUri    String?          @map("replacement_uri")
+  replacementLabel  String?          @map("replacement_label")
+  replacementArt    String?          @map("replacement_art")
+  replacementKind   ReplacementKind? @map("replacement_kind")
+  blockPodcasts     Boolean          @default(true) @map("block_podcasts")
+  blockAudiobooks   Boolean          @default(true) @map("block_audiobooks")
+  quietHours        Json?            @map("quiet_hours")
+  allowedShowIds    Json             @default("[]") @map("allowed_show_ids")
+  timeZone          String           @default("UTC") @map("time_zone")
+  // Loosening changes wait an hour: turning the blocker off, and widening the
+  // allowed hours. Each applies at its time unless cancelled first.
+  offAt             DateTime?        @map("off_at")
+  pendingQuietHours Json?            @map("pending_quiet_hours")
+  quietHoursAt      DateTime?        @map("quiet_hours_at")
 
   @@map("blocker_settings")
 }

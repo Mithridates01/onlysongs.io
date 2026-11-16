@@ -138,8 +138,8 @@ export default async function HomePage() {
               <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
             </svg>
             <div>
-              <h3>Quiet hours</h3>
-              <p>Let podcasts play during the hours you choose, like your evening walk.</p>
+              <h3>Allowed hours</h3>
+              <p>Let podcasts play during the hours you choose, like your evening walk. Loosening the rules waits an hour.</p>
             </div>
           </div>
           <div className="feature-row">

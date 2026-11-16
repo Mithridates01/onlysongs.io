@@ -5,6 +5,7 @@ import { useState } from "react";
 import { outcomeLabel } from "@/lib/outcomes";
 import { switchBlockedReason } from "@/lib/switch-reason";
 import type { StatusResponse } from "@/lib/types";
+import { AllowedHours } from "./AllowedHours";
 import { LocalTime } from "./LocalTime";
 import { ReplacementPicker } from "./ReplacementPicker";
 import { useStatus } from "./useStatus";
@@ -19,6 +20,8 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
   const readySong = Boolean(status.replacement);
   const readySpotify = status.connection === "connected" || status.connection === "quota_paused";
   const on = status.blockerEnabled;
+  // Turning off waits an hour; until then the blocker is still on.
+  const offAt = status.offAt;
   const showPicker = picking || !readySong;
 
   async function toggle() {
@@ -27,7 +30,8 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
     const response = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: !on }),
+      // While a turn-off is waiting, the switch cancels it.
+      body: JSON.stringify({ enabled: offAt ? true : !on }),
     });
     const data = (await response.json().catch(() => ({}))) as { error?: string; warning?: string };
     setPending(false);
@@ -60,7 +64,7 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
     : !readySong
       ? "Pick the song to come back to."
       : status.quietHoursActive
-        ? "Quiet hours. Podcasts can play."
+        ? "Allowed hours. Podcasts can play."
         : on
           ? "Only songs. Breathe easy."
           : "Podcasts can play for now.";
@@ -69,7 +73,7 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
     : !readySong
       ? "Search for a track, playlist or album below, then turn the blocker on."
       : status.quietHoursActive
-        ? "Your quiet hours are on, so podcasts and audiobooks are allowed until the window ends."
+        ? "You’re inside your allowed hours, so podcasts and audiobooks can play until the window ends."
         : on
           ? `If a podcast or audiobook starts, your song comes back within about ${status.intervalSeconds < 90 ? "a minute" : `${Math.round(status.intervalSeconds / 60)} minutes`}.`
           : "Turn the blocker on when you want to stay in the music.";
@@ -129,7 +133,7 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
               <span className={on ? "switch on" : "switch"} aria-hidden="true">
                 <span className="knob" />
               </span>
-              {on ? "Blocker on" : "Blocker off"}
+              {offAt ? "Turning off soon" : on ? "Blocker on" : "Blocker off"}
             </button>
             <button className="btn secondary" type="button" onClick={checkNow} disabled={pending || !readySpotify} style={{ minHeight: 52 }}>
               {pending ? "Checking…" : "Check now"}
@@ -140,6 +144,18 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
               </Link>
             ) : null}
           </div>
+          {offAt ? (
+            <p className="help" style={{ margin: 0 }}>
+              Turns off at <LocalTime iso={offAt} />. Until then, podcasts still get swapped.{" "}
+              <button type="button" className="btn ghost" onClick={toggle} disabled={pending} style={{ padding: "2px 10px", minHeight: 0 }}>
+                Keep it on
+              </button>
+            </p>
+          ) : on && readySpotify ? (
+            <p className="help" style={{ margin: 0 }}>
+              Turning it off takes effect an hour after you ask.
+            </p>
+          ) : null}
           {blockedReason ? (
             <p className="help" style={{ margin: 0 }}>
               {blockedReason}
@@ -207,6 +223,8 @@ export function DashboardPanel({ initial }: { initial: StatusResponse }) {
       </div>
 
       <div className="stack" style={{ marginTop: 20 }}>
+        {readySpotify && readySong ? <AllowedHours status={status} onSaved={refresh} onError={setError} /> : null}
+
         {readySong && status.replacement ? (
           <section className="card" aria-labelledby="song-h">
             <div className="spread">

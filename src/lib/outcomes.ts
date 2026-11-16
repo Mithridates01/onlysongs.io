@@ -16,7 +16,7 @@ export function outcomeLabel(outcome: string): string {
     case "allow_listed":
       return "That show or audiobook is on the allow list.";
     case "quiet_hours":
-      return "Quiet hours are active, so podcasts and audiobooks are allowed right now.";
+      return "You’re inside your allowed hours, so podcasts and audiobooks can play right now.";
     case "cooldown":
       return "Cooling down after the last swap.";
     case "paused":
