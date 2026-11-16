@@ -14,6 +14,8 @@ model User {
   isAdmin         Boolean   @default(false) @map("is_admin")
   emailVerifiedAt DateTime? @map("email_verified_at")
   createdAt       DateTime  @default(now()) @map("created_at")
+  // Operator-only switch for listening-history collection on this account.
+  historyEnabled  Boolean   @default(true) @map("history_enabled")
 
   spotify    SpotifyConnection?
   settings   BlockerSettings?
@@ -22,6 +24,7 @@ model User {
   sessions   Session[]
   authTokens AuthToken[]
   activeDays UserActivityDay[]
+  listening  ListeningEvent[]
 
   @@map("users")
 }
@@ -197,4 +200,44 @@ model UserActivityDay {
   @@id([userId, day])
   @@index([day])
   @@map("user_activity_days")
+}
+
+// Platform-wide switches the operator flips from the admin page.
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
+// Listening history from the background checks. A row is written only when
+// what's playing changes (a new item, or playback stopping), so a song heard
+// across many checks is one row. Shown only on the admin Listening tab.
+model ListeningEvent {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  at            DateTime @default(now())
+  // track | episode | audiobook | ad | unknown | none (nothing playing)
+  kind          String
+  itemUri       String?  @map("item_uri")
+  title         String?
+  artists       String?
+  album         String?
+  showName      String?  @map("show_name")
+  durationMs    Int?     @map("duration_ms")
+  progressMs    Int?     @map("progress_ms")
+  contextType   String?  @map("context_type")
+  contextUri    String?  @map("context_uri")
+  deviceName    String?  @map("device_name")
+  deviceType    String?  @map("device_type")
+  volumePercent Int?     @map("volume_percent")
+  shuffle       Boolean?
+  repeatState   String?  @map("repeat_state")
+  timeZone      String?  @map("time_zone")
+
+  @@index([userId, at])
+  @@index([at])
+  @@map("listening_events")
 }
