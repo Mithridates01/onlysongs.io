@@ -19,11 +19,11 @@ const quietHours = z
     const start = normalizeClock(value.start);
     const end = normalizeClock(value.end);
     if (!start || !end) {
-      ctx.addIssue({ code: "custom", message: "Quiet hours use 24-hour times like 06:00." });
+      ctx.addIssue({ code: "custom", message: "Allowed hours use 24-hour times like 06:00." });
       return z.NEVER;
     }
     if (start === end) {
-      ctx.addIssue({ code: "custom", message: "Quiet hours need a start and end that differ." });
+      ctx.addIssue({ code: "custom", message: "Allowed hours need a start and end that differ." });
       return z.NEVER;
     }
     return { start, end };

@@ -4,6 +4,31 @@ Changes waiting to be released, newest first. Move a section under a version hea
 
 ## Unreleased
 
+### Allowed hours and unlock delay (branch `unlock-delay`)
+
+- Allowed hours (formerly quiet hours) moved to the dashboard: a 24-hour bar shows the window, now, and any change waiting.
+- While the blocker is on, turning it off and widening allowed hours wait one hour; "Keep it on" or "Cancel" undoes them. Narrowing applies at once.
+- Waiting changes apply on the next check, status load or save (`settlePending`), with no timer.
+
+### Listening history (branch `listening-history`)
+
+- **History from checks already being made.** When the worker reads someone's player, a row is saved only if what's playing changed. A song across many checks is one row, and X → Y → X is three. Stopping or pausing counts as a change. No extra Spotify calls.
+- **What's kept:**
+  - type (song, podcast, audiobook, ad), title, artists, album or show, and length
+  - position when first seen
+  - where it was played from (playlist, album, artist page, liked songs) and its link
+  - device name, type and volume
+  - shuffle and repeat, and the listener's time zone
+- **Admin → Listening tab, operators only.** Last-30-day summary:
+  - music, podcast and audiobook mix
+  - plays by hour in each listener's local time
+  - shuffle use
+  - top artists, songs and shows, where people play from, and devices
+  - a per-account table with each person's last 200 changes
+- **Switches and purge.** A platform switch, off until you turn it on, reaches the worker within 30 seconds. A per-account switch is on by default and is never shown to users. Purge works for one account, or for everyone after typing `PURGE ALL`.
+- **Retention.** Rows older than 365 days are deleted by the daily prune. Deleting an account deletes its history.
+- Migration `listening_history` adds `listening_events`, `app_settings` and `users.history_enabled`.
+
 ### Admin metrics and signup emails (branch `admin-metrics`)
 
 - **Setup funnel.** How many accounts reached each step: Spotify keys → Spotify sign-in → song → blocker on → first swap. It shows where people get stuck.

@@ -6,6 +6,7 @@ import { prisma } from "./db";
 import { redirectUri } from "./env";
 import { readWorkerHeart } from "./redis";
 import { isQuietNow, parseQuietHours, startOfZonedDay } from "./quiet-hours";
+import { settlePending } from "./settings";
 import { readAllowedShows } from "./shows";
 import type { ActivityResult } from "@prisma/client";
 import type { ReplacementView, StatusResponse, StatusWarning } from "./types";
@@ -19,11 +20,12 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
   });
   if (!user?.settings || !user.poll) return null;
 
-  const settings = user.settings;
+  const settings = await settlePending(user.settings);
   const poll = user.poll;
   const spotify = user.spotify;
   const quiet = parseQuietHours(settings.quietHours);
   const quietHoursActive = isQuietNow(quiet, settings.timeZone);
+  const pendingQuiet = parseQuietHours(settings.pendingQuietHours);
   const quotaPaused = poll.pauseReason === "quota" && Boolean(poll.pausedUntil && poll.pausedUntil > new Date());
   const connection = connectionState(spotify?.status, Boolean(spotify?.refreshTokenEnc), Boolean(spotify), quotaPaused);
   const worker = await readWorkerHeart();
@@ -76,6 +78,8 @@ export async function buildStatus(userId: string): Promise<StatusResponse | null
     timeZone: settings.timeZone,
     quietHours: quiet ? { start: quiet.start, end: quiet.end } : null,
     quietHoursActive,
+    offAt: settings.offAt?.toISOString() ?? null,
+    pendingQuietHours: pendingQuiet && settings.quietHoursAt ? { start: pendingQuiet.start, end: pendingQuiet.end, at: settings.quietHoursAt.toISOString() } : null,
     allowedShows: readAllowedShows(settings.allowedShowIds),
     connection,
     spotifyUserId: spotify?.spotifyUserId ?? null,

@@ -23,6 +23,9 @@ export type StatusResponse = {
   timeZone: string;
   quietHours: QuietHoursView;
   quietHoursActive: boolean;
+  // Waiting out the unlock delay; ISO times when each applies.
+  offAt: string | null;
+  pendingQuietHours: { start: string; end: string; at: string } | null;
   allowedShows: AllowedShowView[];
   connection: ConnectionState;
   spotifyUserId: string | null;

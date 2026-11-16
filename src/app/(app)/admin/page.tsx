@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminCharts } from "@/components/AdminCharts";
+import { AdminTabs } from "@/components/AdminTabs";
 import { EarlyAccessRequests } from "@/components/EarlyAccessRequests";
 import { earlyAccessStats, loadHealth, loadRetention, loadSwapSeries, loadTopShows } from "@/lib/admin-metrics";
 import { loadSeries } from "@/lib/admin-stats";
@@ -86,6 +87,7 @@ export default async function AdminPage() {
     <>
       <p className="eyebrow">Operator</p>
       <h1 className="page-title">Admin</h1>
+      <AdminTabs current="/admin" />
       <p className="lede">
         Worker {worker.online ? "is checking in" : "has no recent heartbeat"}. {health.blockersOn} blocker
         {health.blockersOn === 1 ? "" : "s"} enabled of {users.length} accounts.
